@@ -1,0 +1,1141 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@600;700&display=swap');
+
+body {
+	background: linear-gradient(135deg, #5a7a50 0%, #4a6741 50%, #6b5d4f 100%); /* Natural terrain gradient */
+	margin: 0;
+	overflow: hidden;
+	touch-action: none;
+	font-family: 'Rajdhani', sans-serif;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* SPLASH SCREEN */
+#splash-screen {
+	position: fixed;
+	inset: 0;
+	background: linear-gradient(135deg, rgba(30, 25, 20, 0.98), rgba(40, 35, 30, 0.95));
+	z-index: 9999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	animation: splashFadeIn 0.5s ease-out;
+}
+
+#splash-screen.fade-out {
+	animation: splashFadeOut 0.8s ease-out forwards;
+}
+
+@keyframes splashFadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes splashFadeOut {
+	to {
+		opacity: 0;
+		visibility: hidden;
+	}
+}
+
+.splash-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: clamp(20px, 4vh, 40px);
+	padding: clamp(20px, 3vh, 40px) 20px;
+	height: 100vh;
+	max-width: 95%;
+	position: relative;
+}
+
+/* Splash Pages */
+.splash-page {
+	display: none;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: clamp(15px, 3vh, 30px);
+	opacity: 0;
+	transform: translateX(100%) scale(0.8) rotateY(45deg);
+	transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+	width: 100%;
+	max-width: 600px;
+	filter: blur(10px);
+}
+
+.splash-page.active {
+	display: flex;
+	opacity: 1;
+	transform: translateX(0) scale(1) rotateY(0deg);
+	filter: blur(0);
+}
+
+.splash-page.prev {
+	opacity: 0;
+	transform: translateX(-100%) scale(0.8) rotateY(-45deg);
+	filter: blur(10px);
+}
+
+.splash-page.next {
+	transform: translateX(100%) scale(0.8) rotateY(45deg);
+}
+
+.splash-title {
+	font-family: 'Black Ops One', cursive;
+	font-size: clamp(28px, 7vw, 72px);
+	color: #d4c5b0;
+	text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.9), 0 0 30px rgba(139, 115, 85, 0.5);
+	letter-spacing: clamp(2px, 1vw, 4px);
+	animation: titlePulse 2s ease-in-out infinite;
+	text-align: center;
+	line-height: 1.1;
+}
+
+@keyframes titlePulse {
+	0%, 100% {
+		text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.9), 0 0 30px rgba(139, 115, 85, 0.5);
+	}
+	50% {
+		text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.9), 0 0 50px rgba(139, 195, 74, 0.7);
+	}
+}
+
+.splash-subtitle {
+	font-size: clamp(12px, 2.5vw, 24px);
+	color: #8bc34a;
+	letter-spacing: clamp(2px, 1.5vw, 8px);
+	font-weight: 300;
+	text-transform: uppercase;
+	text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.splash-dev {
+	margin-top: 2vh;
+	text-align: center;
+	padding: 20px;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Remove the excessive background and effects */
+.splash-dev::after {
+	display: none;
+}
+
+.dev-label {
+	font-family: 'Rajdhani', sans-serif;
+	font-size: 10px;
+	color: #8b7355;
+	letter-spacing: 4px;
+	font-weight: 700;
+	text-transform: uppercase;
+	opacity: 0.7;
+	margin-bottom: 5px;
+}
+
+.dev-branding {
+	margin-bottom: 5px;
+	display: flex;
+	justify-content: center;
+}
+
+.dev-crest {
+	position: relative;
+	width: 60px;
+	height: 60px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background: radial-gradient(circle, rgba(250, 204, 21, 0.1), transparent 70%);
+}
+
+.dev-crest-ring {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	border: 1px solid rgba(212, 175, 55, 0.4); /* Elegant gold */
+	box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+	animation: crestRotate 20s linear infinite;
+}
+
+.dev-crest-ring::after {
+	content: '';
+	position: absolute;
+	top: -2px; left: 50%;
+	width: 4px; height: 4px;
+	background: #d4af37;
+	border-radius: 50%;
+	box-shadow: 0 0 5px #d4af37;
+}
+
+.dev-crest-core {
+	font-family: 'Rajdhani', sans-serif;
+	font-weight: 700;
+	font-size: 20px;
+	letter-spacing: 1px;
+	color: #fef3c7;
+	text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+	z-index: 1;
+}
+
+.dev-crest-glow {
+	display: none; /* Remove excessive glow */
+}
+
+.dev-name {
+	font-family: 'Rajdhani', sans-serif; /* Cleaner, more professional font */
+	font-weight: 700;
+	font-size: clamp(24px, 5vw, 32px);
+	letter-spacing: 0.15em;
+	color: #fef3c7;
+	background: linear-gradient(to bottom, #fff8e1, #d4af37);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	text-transform: uppercase;
+	margin: 5px 0;
+	text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.dev-alias {
+	display: none; /* Remove alias to clean up */
+}
+
+.dev-tagline {
+	font-family: 'Rajdhani', sans-serif;
+	font-size: 11px;
+	color: #a89070;
+	letter-spacing: 0.3em;
+	text-transform: uppercase;
+	margin-top: 5px;
+	opacity: 0.8;
+	border-top: 1px solid rgba(168, 144, 112, 0.3);
+	padding-top: 8px;
+	width: 100%;
+	max-width: 200px;
+}
+
+@keyframes crestRotate {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.health-warning {
+	margin-top: clamp(10px, 2vh, 20px);
+	max-width: 600px;
+	padding: clamp(10px, 2vh, 15px) clamp(12px, 3vw, 20px);
+	background: rgba(180, 70, 40, 0.2);
+	border: 2px solid rgba(180, 70, 40, 0.5);
+	border-radius: 8px;
+	display: flex;
+	gap: clamp(8px, 2vw, 12px);
+	align-items: flex-start;
+}
+
+.warning-icon {
+	font-size: clamp(24px, 6vw, 32px);
+	flex-shrink: 0;
+	line-height: 1;
+}
+
+.warning-text {
+	font-size: clamp(10px, 2vw, 13px);
+	color: #d4c5b0;
+	text-align: left;
+	line-height: 1.5;
+}
+
+.warning-text strong {
+	color: #ff8866;
+	display: block;
+	margin-bottom: 4px;
+}
+
+.splash-loading {
+	position: fixed;
+	bottom: 50px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 300px;
+	max-width: 85%;
+	z-index: 10;
+}
+
+.loading-bar {
+	width: 100%;
+	height: 6px;
+	background: rgba(50, 42, 35, 0.8);
+	border: 1px solid rgba(139, 115, 85, 0.5);
+	border-radius: 3px;
+	overflow: hidden;
+	position: relative;
+}
+
+.loading-bar::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, #8bc34a, transparent);
+	animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+	to {
+		left: 100%;
+	}
+}
+
+@keyframes devAurora {
+	0% {
+		transform: rotate(0deg) scale(1);
+		opacity: 0.7;
+	}
+	50% {
+		transform: rotate(8deg) scale(1.05);
+		opacity: 0.95;
+	}
+	100% {
+		transform: rotate(-4deg) scale(1);
+		opacity: 0.8;
+	}
+}
+
+@keyframes titleGlow {
+	0% {
+		background-position: 0% 50%;
+		text-shadow: 0 0 8px rgba(255, 230, 180, 0.4);
+	}
+	50% {
+		background-position: 100% 50%;
+		text-shadow: 0 0 14px rgba(255, 230, 180, 0.8);
+	}
+	100% {
+		background-position: 0% 50%;
+		text-shadow: 0 0 8px rgba(255, 230, 180, 0.4);
+	}
+}
+
+@keyframes crestOrbit {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes crestPulse {
+	0% {
+		opacity: 0.4;
+		transform: scale(0.9);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1.05);
+	}
+	100% {
+		opacity: 0.4;
+		transform: scale(0.92);
+	}
+}
+
+@keyframes taglineSlide {
+	0% {
+		letter-spacing: 0.15em;
+		opacity: 0.6;
+	}
+	50% {
+		letter-spacing: 0.35em;
+		opacity: 1;
+	}
+	100% {
+		letter-spacing: 0.15em;
+		opacity: 0.6;
+	}
+}
+
+@keyframes slideInDown {
+	from {
+		opacity: 0;
+		transform: translateY(-100%) scale(0.9) rotateX(20deg);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1) rotateX(0deg);
+	}
+}
+
+@keyframes slideOutUp {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1) rotateX(0deg);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-100%) scale(0.85) rotateX(-15deg);
+	}
+}
+
+@keyframes slideInFromRight {
+	from {
+		opacity: 0;
+		transform: translateX(100%) scale(0.9) rotateY(-25deg);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0) scale(1) rotateY(0deg);
+	}
+}
+
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* Splash Pagination */
+.splash-pagination {
+	display: none; /* Hidden - auto-advance only */
+}
+
+.dot {
+	display: none;
+}
+
+.splash-hint {
+	display: none; /* Hidden - auto-advance only */
+}
+
+@keyframes blink {
+	0%, 100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+.loading-text {
+	margin-top: 10px;
+	font-size: 12px;
+	color: #8b7355;
+	letter-spacing: 2px;
+	font-weight: 600;
+}
+
+/* DEMO CANVAS (Homepage background) */
+#demoCanvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+	display: none;
+	opacity: 0;
+	transition: opacity 1.2s ease-in;
+}
+
+#demoCanvas.active {
+	display: block;
+	opacity: 1;
+}
+
+canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+#gameCanvas {
+	position: relative;
+	z-index: 10;
+	opacity: 0;
+	transition: opacity 0.8s ease-in;
+}
+
+#gameCanvas.active {
+	opacity: 1;
+}
+
+/* UI LAYER */
+#ui-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 20;
+	padding: max(10px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	opacity: 0;
+	transition: opacity 0.5s ease-in;
+}
+
+#ui-layer.active {
+	opacity: 1;
+}
+
+/* HUD TOP */
+.hud-top {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	width: 100%;
+	padding: 10px;
+	pointer-events: auto;
+}
+
+/* STATS PANEL */
+.stats-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: clamp(170px, 22vw, 260px);
+	background: rgba(70, 60, 50, 0.92); /* Dark earthy brown */
+	padding: clamp(8px, 1.5vh, 12px);
+	border-radius: 6px;
+	border: 2px solid rgba(139, 115, 85, 0.6); /* Tan border */
+	backdrop-filter: blur(4px);
+	box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.bar-group {
+	width: 100%;
+}
+
+.bar-label {
+	font-size: clamp(11px, 2vw, 14px);
+	font-weight: 800;
+	color: #d4c5b0; /* Light tan text */
+	letter-spacing: 0.5px;
+	margin-bottom: 2px;
+	display: flex;
+	justify-content: space-between;
+}
+
+.bar-frame {
+	width: 100%;
+	height: clamp(8px, 2vh, 14px);
+	background: rgba(30, 25, 20, 0.8); /* Dark brown background */
+	border: 1px solid rgba(139, 115, 85, 0.5); /* Tan border */
+	border-radius: 2px;
+	overflow: hidden;
+	position: relative;
+}
+
+.bar-fill {
+	height: 100%;
+	transition: width 0.1s linear;
+}
+
+.bar-value {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: clamp(9px, 1.5vw, 12px);
+	font-weight: bold;
+	color: white;
+	text-shadow: 1px 1px 1px black;
+	z-index: 2;
+	line-height: 1;
+	text-align: center;
+}
+
+.hp-fill {
+	background: linear-gradient(90deg, #16a34a, #4ade80);
+}
+
+.armor-fill {
+	background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+}
+
+.en-fill {
+	background: linear-gradient(90deg, #0891b2, #22d3ee);
+}
+
+.ks-fill {
+	background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+
+.weapon-info {
+	margin-top: 4px;
+	font-family: 'Black Ops One', cursive;
+	font-size: clamp(18px, 2.5vw, 24px);
+	color: #f0e6d2; /* Light tan text */
+	text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+	text-align: left;
+	background: linear-gradient(135deg, #4a6741, #5a7a50); /* Military green */
+	padding: 4px 8px;
+	border-radius: 4px;
+	border: 2px solid #6b8055;
+	box-shadow: inset 0 1px 2px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* TOP RIGHT CONTAINER */
+.top-right {
+	display: flex;
+	align-items: flex-start;
+	gap: 15px;
+}
+
+/* MINIMAP */
+.minimap-box {
+	width: clamp(100px, 25vw, 150px);
+	height: clamp(100px, 25vw, 150px);
+	border: 3px solid rgba(139, 115, 85, 0.8); /* Tan border */
+	background: rgba(30, 25, 20, 0.6); /* Dark brown background */
+	border-radius: 6px;
+	backdrop-filter: blur(6px);
+	box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* PAUSE BUTTON */
+.pause-btn {
+	width: 40px;
+	height: 40px;
+	background: rgba(70, 60, 50, 0.95); /* Dark brown */
+	border: 2px solid rgba(139, 115, 85, 0.8); /* Tan border */
+	border-radius: 6px;
+	color: #d4c5b0; /* Light tan text */
+	font-weight: bold;
+	font-family: sans-serif;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.2s;
+	pointer-events: auto;
+	box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+}
+
+.pause-btn:hover {
+	background: rgba(90, 80, 70, 1); /* Lighter brown */
+	border-color: rgba(139, 115, 85, 1);
+	transform: scale(1.05);
+}
+
+/* CONTROLS AREA */
+.controls-area {
+	width: 100%;
+	height: 220px;
+	pointer-events: auto;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-end;
+	padding: 0 40px 40px 40px;
+	box-sizing: border-box;
+	z-index: 50;
+	transition: opacity 0.2s ease;
+}
+
+.joystick-container {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.joystick-base {
+	width: clamp(85px, 18vw, 135px);
+	height: clamp(85px, 18vw, 135px);
+	max-width: 130px;
+	max-height: 140px;
+	background: rgba(60, 50, 40, 0.7); /* Dark brown */
+	border: 3px dashed rgba(139, 115, 85, 0.6); /* Tan dashed border */
+	border-radius: 50%;
+	position: relative;
+	flex-shrink: 0;
+	backdrop-filter: blur(2px);
+	box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.joystick-label {
+	position: absolute;
+	top: 15%;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 100%;
+	text-align: center;
+	color: rgba(34, 211, 238, 0.7);
+	font-size: clamp(7px, 1.3vw, 10px);
+	font-weight: bold;
+	letter-spacing: 2px;
+	pointer-events: none;
+	z-index: 1;
+	text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.9);
+	text-transform: uppercase;
+}
+
+.joystick-label-red {
+	color: rgba(248, 113, 113, 0.7);
+}
+
+.joystick-stick {
+	width: 40%;
+	height: 40%;
+	border-radius: 50%;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+	transition: transform 0.05s ease-out;
+}
+
+.joy-left .joystick-stick {
+	background: rgba(74, 103, 65, 0.8); /* Military green */
+	border: 3px solid #5a7a50;
+	box-shadow: 0 0 12px rgba(90, 122, 80, 0.6);
+}
+
+.joy-right .joystick-stick {
+	background: rgba(180, 70, 40, 0.8); /* Dark orange-red */
+	border: 3px solid #b44628;
+	box-shadow: 0 0 12px rgba(180, 70, 40, 0.6);
+}
+
+body.touch-controls-hidden .controls-area {
+	opacity: 0;
+	pointer-events: none;
+}
+
+body.touch-controls-hidden .joystick-container {
+	visibility: hidden;
+}
+
+@keyframes missionBackdrop {
+	0% {
+		opacity: 0;
+		filter: blur(12px);
+	}
+
+	100% {
+		opacity: 1;
+		filter: blur(0);
+	}
+}
+
+@keyframes missionContent {
+	0% {
+		opacity: 0;
+		transform: translateY(50px) scale(0.9);
+	}
+
+	60% {
+		opacity: 1;
+		transform: translateY(-10px) scale(1.05);
+	}
+
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* ULT BUTTON */
+.ult-btn {
+	margin-bottom: 35px;
+	width: clamp(50px, 12vw, 70px);
+	height: clamp(50px, 12vw, 70px);
+	background: radial-gradient(circle, #6b8055 20%, #4a6741 100%); /* Olive green */
+	border: 3px solid rgba(139, 115, 85, 0.8); /* Tan border */
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #d4c5b0; /* Light tan text */
+	font-weight: bold;
+	font-family: 'Black Ops One';
+	font-size: 10px;
+	letter-spacing: 1px;
+	box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.5);
+	opacity: 0.7;
+	pointer-events: auto;
+	transition: all 0.3s;
+	cursor: pointer;
+	z-index: 60;
+}
+
+.ult-active {
+	opacity: 1;
+	animation: pulseUlt 0.8s infinite;
+	filter: brightness(1.2);
+}
+
+/* OVERLAYS */
+#overlay,
+#gameover-screen {
+	position: absolute;
+	inset: 0;
+	background: rgba(15, 12, 10, 0.4);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 100;
+	padding: 20px;
+	text-align: center;
+	transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+	transform-origin: center;
+}
+
+#overlay.hidden,
+#gameover-screen.hidden {
+	opacity: 0;
+	transform: scale(0.95);
+	pointer-events: none;
+	transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+	animation: overlayExit 0.6s ease-out forwards;
+}
+
+@keyframes overlayExit {
+	from {
+		opacity: 1;
+		transform: scale(1) rotateY(0deg);
+		filter: blur(0);
+	}
+	to {
+		opacity: 0;
+		transform: scale(0.85) rotateY(-20deg);
+		filter: blur(15px);
+	}
+}
+
+#overlay:not(.hidden),
+#gameover-screen:not(.hidden) {
+	opacity: 1;
+	transform: scale(1);
+	animation: overlayEnter 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes overlayEnter {
+	from {
+		opacity: 0;
+		transform: scale(0.8) rotateX(30deg);
+		filter: blur(20px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) rotateX(0deg);
+		filter: blur(0);
+	}
+}
+
+/* PAUSE SCREEN - Blurred and brighter */
+#pause-screen {
+	position: absolute;
+	inset: 0;
+	background: rgba(80, 70, 60, 0.4); /* Lighter brown with more transparency */
+	backdrop-filter: blur(12px) brightness(1.3); /* Strong blur + brightness boost */
+	-webkit-backdrop-filter: blur(12px) brightness(1.3);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 100;
+	padding: 20px;
+	text-align: center;
+}
+
+.title-text {
+	font-family: 'Black Ops One';
+	color: #d4c5b0; /* Light tan */
+	text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8), 0 0 20px rgba(139, 115, 85, 0.4);
+	line-height: 1.1;
+}
+
+.hidden {
+	display: none !important;
+}
+
+#gameover-screen.mission-failed-enter {
+	animation: missionBackdrop 0.8s ease forwards;
+	backdrop-filter: blur(10px) brightness(0.7);
+	-webkit-backdrop-filter: blur(10px) brightness(0.7);
+}
+
+#gameover-screen.mission-failed-enter h1,
+#gameover-screen.mission-failed-enter p,
+#gameover-screen.mission-failed-enter button {
+	opacity: 0;
+	animation: missionContent 0.85s ease forwards;
+}
+
+#gameover-screen.mission-failed-enter h1 {
+	animation-delay: 0.1s;
+}
+
+#gameover-screen.mission-failed-enter p {
+	animation-delay: 0.25s;
+}
+
+#gameover-screen.mission-failed-enter button {
+	animation-delay: 0.4s;
+}
+
+@keyframes pulseUlt {
+	0% {
+		transform: scale(1);
+		box-shadow: 0 0 20px red;
+	}
+
+	50% {
+		transform: scale(1.1);
+		box-shadow: 0 0 40px red;
+	}
+
+	100% {
+		transform: scale(1);
+		box-shadow: 0 0 20px red;
+	}
+}
+
+#boss-warning {
+	position: absolute;
+	top: 35%;
+	width: 100%;
+	text-align: center;
+	color: #ff3333; /* Bright red */
+	font-family: 'Black Ops One';
+	font-size: clamp(24px, 5vw, 40px);
+	letter-spacing: 2px;
+	text-shadow: 0 0 20px #ff0000, 3px 3px 6px rgba(0, 0, 0, 0.9);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.5s;
+	z-index: 40;
+}
+
+.keyboard-hint {
+	position: absolute;
+	bottom: 250px;
+	width: 100%;
+	text-align: center;
+	color: rgba(212, 197, 176, 0.5); /* Light tan semi-transparent */
+	font-size: 12px;
+	font-family: monospace;
+	pointer-events: none;
+	letter-spacing: 1px;
+}
+
+.score-list {
+	width: min(380px, 88vw);
+	margin-bottom: 25px;
+	background: rgba(35, 30, 25, 0.9);
+	padding: 14px 18px;
+	border-radius: 10px;
+	border: 2px solid rgba(139, 115, 85, 0.5);
+	display: flex;
+	flex-direction: row;
+	gap: 14px;
+	backdrop-filter: blur(20px) saturate(120%);
+	-webkit-backdrop-filter: blur(20px) saturate(120%);
+}
+
+/* Portrait mode: stack scores vertically */
+@media (orientation: portrait) {
+	.score-list {
+		flex-direction: column;
+		gap: 12px;
+	}
+	
+	.score-divider {
+		width: 100% !important;
+		height: 2px !important;
+		background: linear-gradient(to right, transparent, rgba(139, 115, 85, 0.6), transparent) !important;
+		margin: 0 !important;
+	}
+}
+
+/* Landscape mode: keep horizontal layout (default) */
+@media (orientation: landscape) {
+	.score-list {
+		flex-direction: row;
+	}
+	
+	.score-divider {
+		width: 2px !important;
+		height: auto !important;
+	}
+}
+
+.score-row {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: rgba(50, 42, 35, 0.8); /* Dark brown */
+	border: 1px solid rgba(139, 115, 85, 0.4); /* Tan border */
+	padding: 10px 12px;
+	border-radius: 8px;
+	color: #d4c5b0; /* Light tan text */
+	font-size: 11px;
+	font-family: 'Rajdhani', sans-serif;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	transition: all 0.3s;
+	flex: 1;
+	min-width: 0;
+}
+
+.score-row span:first-child {
+	font-size: 12px;
+	opacity: 0.7;
+	margin-bottom: 4px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+.score-row span:last-child {
+	font-size: 22px;
+	font-weight: 700;
+	font-family: 'Black Ops One', cursive;
+	line-height: 1;
+}
+
+.score-row:hover {
+	background: rgba(70, 60, 50, 0.95); /* Lighter brown */
+	transform: scale(1.05);
+	box-shadow: 2px 2px 12px rgba(139, 115, 85, 0.5); /* Tan glow */
+	z-index: 1;
+}
+
+.score-highest {
+	border-color: rgba(90, 122, 80, 0.7); /* Green border */
+	background: linear-gradient(135deg, rgba(74, 103, 65, 0.4), rgba(50, 42, 35, 0.9)); /* Green to brown */
+	box-shadow: 2px 2px 12px rgba(90, 122, 80, 0.5); /* Green glow */
+}
+
+.score-highest span:first-child {
+	color: #fbbf24;
+	opacity: 0.9;
+}
+
+.score-highest span:last-child {
+	color: #8bc34a; /* Bright green */
+	font-weight: bold;
+	font-size: 24px;
+	text-shadow: 0 0 10px rgba(139, 195, 74, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.score-last {
+	border-color: rgba(139, 115, 85, 0.6); /* Tan border */
+	background: rgba(60, 50, 40, 0.95); /* Slightly lighter brown */
+}
+
+.score-last span:last-child {
+	color: #d4c5b0; /* Light tan */
+	text-shadow: 0 0 8px rgba(212, 197, 176, 0.3), 1px 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Landscape Optimizations */
+@media (orientation: landscape) {
+	.minimap-box {
+		width: 110px;
+		height: 110px;
+	}
+
+	.controls-area {
+		padding: 0 20px 15px 20px;
+		height: 180px;
+	}
+	
+	.joystick-base {
+		width: clamp(75px, 15vw, 110px);
+		height: clamp(75px, 15vw, 110px);
+		max-width: 110px;
+	}
+	
+	.ult-btn {
+		width: clamp(45px, 10vw, 60px);
+		height: clamp(45px, 10vw, 60px);
+		margin-bottom: 25px;
+	}
+	
+	/* Larger HUD for landscape mode */
+	.stats-panel {
+		width: clamp(200px, 20vw, 280px);
+		padding: clamp(10px, 2vh, 14px);
+	}
+	
+	.bar-label {
+		font-size: clamp(12px, 2vw, 14px);
+	}
+	
+	.bar-frame {
+		height: clamp(14px, 3vh, 20px);
+	}
+	
+	.bar-value {
+		font-size: clamp(11px, 1.8vw, 14px);
+	}
+	
+	.weapon-info {
+		font-size: clamp(20px, 2.5vw, 26px);
+		padding: 6px 10px;
+	}
+}
+
+/* Mobile Adjustments */
+@media (max-width: 600px) {
+	.controls-area {
+		padding: 0 15px 20px 15px;
+		height: clamp(200px, 35vh, 260px);
+	}
+
+	.minimap-box {
+		width: clamp(80px, 18vw, 110px);
+		height: clamp(80px, 18vw, 110px);
+	}
+
+	.stats-panel {
+		width: clamp(160px, 45vw, 220px);
+		font-size: clamp(0.85em, 2vw, 1em);
+	}
+
+	.ult-btn {
+		margin-bottom: clamp(30px, 6vh, 60px);
+	}
+
+	.weapon-info {
+		font-size: clamp(14px, 3.5vw, 22px);
+	}
+}
