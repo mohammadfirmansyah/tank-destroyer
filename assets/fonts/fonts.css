@@ -1,0 +1,67 @@
+/* Local Font Definitions - Downloaded from Google Fonts */
+/* Black Ops One - Military style display font */
+@font-face {
+    font-family: 'Black Ops One';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./BlackOpsOne-Regular.ttf') format('truetype');
+}
+
+/* Rajdhani - Modern technical font for UI (all weights) */
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('./Rajdhani-Light.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./Rajdhani-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./Rajdhani-Medium.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./Rajdhani-SemiBold.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./Rajdhani-Bold.ttf') format('truetype');
+}
+
+/* Orbitron - Futuristic geometric font */
+@font-face {
+    font-family: 'Orbitron';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./Orbitron-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Orbitron';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./Orbitron-Bold.ttf') format('truetype');
+}

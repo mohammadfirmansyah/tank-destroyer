@@ -24,7 +24,7 @@ The game can be deployed to any static file hosting service:
    ```
 2. **Access URL:**
    ```
-   https://yourusername.github.io/tank-destroyer/tank-destroyer.html
+   https://yourusername.github.io/tank-destroyer/
    ```
 
 #### Netlify
@@ -58,14 +58,14 @@ vercel --prod
 # Python 3.x
 python -m http.server 8000
 
-# Access at: http://localhost:8000/tank-destroyer.html
+# Access at: http://localhost:8000
 ```
 
 #### Node.js (http-server)
 ```bash
 npx http-server -p 8000
 
-# Access at: http://localhost:8000/tank-destroyer.html
+# Access at: http://localhost:8000
 ```
 
 #### VS Code Live Server Extension
@@ -104,7 +104,7 @@ Edit **`js/render.js`**:
 
 ### Modifying UI Layout
 
-Edit **`tank-destroyer.html`** and **`css/style.css`**:
+Edit **`index.html`** and **`css/style.css`**:
 - HUD positioning
 - Menu layouts
 - Color themes
@@ -152,7 +152,7 @@ Ensure all these files are included:
 
 ```
 tank-destroyer/
-├── tank-destroyer.html    ✅ Entry point
+├── index.html              ✅ Entry point
 ├── css/
 │   └── style.css           ✅ Styles
 ├── js/
@@ -165,8 +165,12 @@ tank-destroyer/
 │   ├── input.js            ✅ Controls
 │   ├── demo.js             ✅ Demo battle
 │   ├── splash.js           ✅ Splash screen
+│   ├── achievements.js     ✅ Achievement system
+│   ├── saveManager.js      ✅ Save/Load game state
+│   ├── tailwind.js         ✅ Tailwind CSS (local)
 │   └── main.js             ✅ Initialization
-├── assets/                 ✅ (if any)
+├── assets/
+│   └── fonts/              ✅ Custom fonts (Rajdhani, Black Ops One)
 ├── README.md               ✅ Documentation
 ├── CONTRIBUTING.md         ✅ Contribution guide
 ├── CHANGELOG.md            ✅ Version history
@@ -266,5 +270,5 @@ For deployment issues:
 
 ---
 
-**Last Updated:** 2025-11-21  
-**Version:** 1.0.0
+**Last Updated:** 2025-11-30  
+**Version:** 2.0.0-rc.1

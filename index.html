@@ -4,7 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tank Destroyer: Ultimate Edition</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Local font definitions -->
+    <link rel="stylesheet" href="assets/fonts/fonts.css">
+    <!-- Tailwind CSS v4 (local file) -->
+    <script src="js/tailwind.js"></script>
+    <!-- Critical CSS - Inline to prevent flash of unstyled content -->
+    <style>
+        /* Body starts invisible, fades in when assets loaded */
+        html { background: #000; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #000; 
+            opacity: 0; 
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Rajdhani', system-ui, sans-serif;
+            font-weight: 500;
+        }
+        body.loaded { opacity: 1; }
+        /* Ensure all text uses Rajdhani by default */
+        *, *::before, *::after {
+            font-family: inherit;
+        }
+        /* Custom font classes that override Tailwind defaults */
+        .font-black { font-weight: 900; font-family: 'Black Ops One', 'Impact', sans-serif !important; }
+        .font-display { font-family: 'Black Ops One', 'Impact', sans-serif !important; }
+    </style>
+    <!-- Main game styles (loads after Tailwind to override) -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -13,13 +39,13 @@
     <div id="splash-screen">
         <div class="splash-content">
             <!-- Page 1: Game Title -->
-            <div class="splash-page active" data-page="1">
+            <div class="splash-page" data-page="1">
                 <h1 class="splash-title">TANK DESTROYER</h1>
                 <div class="splash-subtitle">ULTIMATE EDITION</div>
             </div>
             
             <!-- Page 2: Developer Info -->
-            <div class="splash-page" data-page="2">
+            <div class="splash-page next" data-page="2">
                 <div class="splash-dev">
                     <div class="dev-label">PRODUCED BY</div>
                     <div class="dev-branding">
@@ -34,7 +60,7 @@
             </div>
             
             <!-- Page 3: Health Warning -->
-            <div class="splash-page" data-page="3">
+            <div class="splash-page next" data-page="3">
                 <div class="health-warning">
                     <div class="warning-icon">⚠️</div>
                     <div class="warning-text">
@@ -49,11 +75,10 @@
                 <div class="loading-bar"></div>
                 <div class="loading-text">LOADING BATTLEFIELD...</div>
             </div>
-            </div>
             
             <!-- Pagination Dots -->
             <div class="splash-pagination">
-                <span class="dot active" data-page="1"></span>
+                <span class="dot" data-page="1"></span>
                 <span class="dot" data-page="2"></span>
                 <span class="dot" data-page="3"></span>
             </div>
@@ -69,37 +94,65 @@
     
     <!-- UI LAYER -->
     <div id="ui-layer">
+        <!-- Achievement Popup Container -->
+        <div id="achievement-popup-container"></div>
+
         <div class="hud-top">
             <div class="stats-panel">
-                <div class="bar-group">
+                <div id="hp-bar-group" class="bar-group bar-visible">
                     <div class="bar-label"><span>HP</span><span id="revive-indicator" style="color:#ff69b4;font-weight:900;margin-left:8px;">❤️ 0x</span></div>
                     <div class="bar-frame"><div id="hp-fill" class="bar-fill hp-fill" style="width: 100%;"></div><div id="hp-text" class="bar-value">200/200</div></div>
                 </div>
-                <div class="bar-group" style="margin-top:4px;">
-                    <div class="bar-label"><span>WEAPON ENERGY</span></div>
+                <div id="armor-bar-group" class="bar-group bar-hidden" style="margin-top:4px;">
+                    <div class="bar-label"><span>ARMOR</span></div>
+                    <div class="bar-frame"><div id="armor-fill" class="bar-fill armor-fill" style="width: 0%;"></div><div id="armor-text" class="bar-value">0</div></div>
+                </div>
+                <div id="energy-bar-group" class="bar-group bar-visible" style="margin-top:4px;">
+                    <div class="bar-label"><span>WEAPON ENERGY</span><span id="temp-indicator" style="color:#00ff00;font-weight:900;margin-left:8px;">20°C</span></div>
                     <div class="bar-frame"><div id="en-fill" class="bar-fill en-fill" style="width: 100%;"></div><div id="en-text" class="bar-value">100%</div></div>
                 </div>
-                <div class="bar-group" style="margin-top:4px;">
+                <div id="ks-bar-group" class="bar-group bar-visible" style="margin-top:4px;">
                     <div class="bar-label"><span>KILL STREAK</span></div>
                     <div class="bar-frame"><div id="ks-fill" class="bar-fill ks-fill" style="width: 0%;"></div></div>
                 </div>
                 <div id="weapon-name" class="weapon-info">CANNON</div>
+                <!-- Passive Item Indicators (dmgmult, critical, etc.) -->
+                <div id="passive-indicators" class="passive-indicators"></div>
             </div>
             
             <div class="top-right">
                 <canvas id="minimap" class="minimap-box" width="110" height="110"></canvas>
                 <div class="pause-btn" id="pause-btn">II</div>
+                <!-- Wave Indicator - Positioned responsively -->
+                <div id="wave-indicator">WAVE 1</div>
             </div>
         </div>
 
         <div id="boss-warning">⚠ MOTHERSHIP DETECTED ⚠</div>
+        
+        <!-- FPS Debug HUD (only visible when DEBUG_SHOW_FPS=true) -->
+        <div id="fps-hud" class="fps-hud" style="display: none;">
+            <span id="fps-value" class="fps-value">-- FPS</span>
+            <span class="fps-separator">│</span>
+            <span id="fps-avg" class="fps-avg">avg --</span>
+            <span class="fps-separator">│</span>
+            <span id="fps-ms" class="fps-ms">-- ms</span>
+        </div>
+        
+        <!-- Wave Transition Timer -->
+        <div id="wave-timer" style="display: none;"></div>
 
         <div class="keyboard-hint desktop:block hidden">[ WASD: MOVE ] [ MOUSE/ARROWS: AIM & FIRE ]</div>
 
         <div class="controls-area">
             <!-- LEFT JOYSTICK -->
-            <div class="joystick-container">
-                <div style="flex-grow:1"></div>
+            <div class="joystick-container left-control">
+                <div class="ability-slot ability-slot--turbo">
+                    <div id="turbo-btn" class="turbo-btn ability-btn">
+                        <span class="ability-main">TURBO</span>
+                        <span class="ability-sub">EMPTY</span>
+                    </div>
+                </div>
                 <div id="stick-l" class="joystick-base joy-left">
                     <div class="joystick-label">MOVE</div>
                     <div id="thumb-l" class="joystick-stick"></div>
@@ -107,9 +160,13 @@
             </div>
 
             <!-- RIGHT JOYSTICK -->
-            <div class="joystick-container">
-                <div style="flex-grow:1"></div>
-                <div id="ult-btn" class="ult-btn">ULTIMATE</div>
+            <div class="joystick-container right-control">
+                <div class="ability-slot ability-slot--ult">
+                    <div id="ult-btn" class="ult-btn ability-btn">
+                        <span class="ability-main">ULTIMATE</span>
+                        <span class="ability-sub">LOCKED</span>
+                    </div>
+                </div>
                 <div id="stick-r" class="joystick-base joy-right">
                     <div class="joystick-label joystick-label-red">AIM & FIRE</div>
                     <div id="thumb-r" class="joystick-stick"></div>
@@ -120,43 +177,106 @@
 
     <!-- MENUS -->
     <div id="overlay" class="hidden">
-        <h1 class="text-5xl md:text-7xl font-black mb-2 title-text">TANK DESTROYER</h1>
-        <div class="text-sm md:text-xl mb-10 tracking-[0.5em] opacity-80 font-light" style="color: #8bc34a;">ULTIMATE EDITION</div>
-        <div class="score-list" id="high-scores-list"><div class="text-sm" style="color: #d4c5b0;">Retrieving Data...</div></div>
-        <button id="start-btn" class="px-12 py-4 font-bold rounded border transition transform active:scale-95 tracking-widest text-xl cursor-pointer" style="background: linear-gradient(135deg, #4a6741, #5a7a50); color: #d4c5b0; border: 3px solid #6b8055; box-shadow: 2px 2px 15px rgba(0,0,0,0.6);">DEPLOY TANK</button>
+        <h1 class="font-black title-text" style="font-size: clamp(1.75rem, 8vw, 4.5rem); margin-bottom: clamp(0.5rem, 1vh, 1rem); line-height: 1;">TANK DESTROYER</h1>
+        <div class="font-semibold" style="color: #8bc34a; font-size: clamp(0.65rem, 2.5vw, 1.25rem); letter-spacing: 0.3em; margin-bottom: clamp(1rem, 3vh, 2.5rem); font-family: 'Rajdhani', sans-serif;">ULTIMATE EDITION</div>
+        <div class="score-list w-64" id="high-scores-list"><div class="text-sm" style="color: #d4c5b0;">Retrieving Data...</div></div>
+        
+        <div class="menu-buttons flex flex-col gap-4 w-64 items-center">
+            <button id="resume-game-btn" class="inactive px-6 py-3 font-bold rounded border transition transform active:scale-95 tracking-widest cursor-pointer w-full" style="background: linear-gradient(135deg, #d97706, #fbbf24); color: #3e2c1c; border: 3px solid #b45309; box-shadow: 2px 2px 15px rgba(0,0,0,0.6);">RESUME BATTLE</button>
+            <button id="start-btn" class="px-6 py-3 font-bold rounded border transition transform active:scale-95 tracking-widest cursor-pointer w-full" style="background: linear-gradient(135deg, #4a6741, #5a7a50); color: #d4c5b0; border: 3px solid #6b8055; box-shadow: 2px 2px 15px rgba(0,0,0,0.6);">DEPLOY TANK</button>
+            <button id="achievements-btn" class="px-6 py-3 font-bold rounded border transition transform active:scale-95 tracking-widest cursor-pointer w-full" style="background: rgba(70, 60, 50, 0.9); color: #d4c5b0; border: 3px solid #8b7355; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);">ACHIEVEMENTS</button>
+        </div>
         
         <!-- Version Number -->
-        <div style="position: absolute; bottom: 20px; right: 30px; font-family: 'Courier New', monospace; font-size: 12px; color: rgba(212, 197, 176, 0.5); letter-spacing: 1px;">
-            v1.0.1
+        <div class="version-number">v2.0.0-rc.1</div>
+    </div>
+
+    <div id="achievements-screen" class="hidden">
+        <div class="ach-header">
+            <h1 class="title-text tracking-widest">ACHIEVEMENTS</h1>
+            <div class="ach-subtitle">MEDALS OF HONOR</div>
         </div>
+        
+        <div id="achievements-list" class="achievements-grid">
+            <!-- Populated by JS -->
+        </div>
+
+        <button id="ach-back-btn">BACK TO BASE</button>
     </div>
 
     <div id="pause-screen" class="hidden">
-        <h1 class="text-6xl font-black mb-8 tracking-widest font-[Black Ops One]" style="color: #d4c5b0; text-shadow: 3px 3px 6px rgba(0,0,0,0.8);">PAUSED</h1>
-        <div class="flex flex-col gap-4 w-64">
-            <button id="resume-btn" class="px-6 py-3 font-bold rounded border transition hover:scale-105 tracking-widest" style="background: #5a7a50; color: #d4c5b0; border: 3px solid #6b8055; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);">RESUME</button>
-            <button id="restart-pause-btn" class="px-6 py-3 font-bold rounded border transition hover:scale-105 tracking-widest" style="background: #b44628; color: #d4c5b0; border: 3px solid #8b5a3c; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);">RESTART</button>
-            <button id="home-btn" class="px-6 py-3 font-bold rounded border transition hover:scale-105 tracking-widest" style="background: rgba(70, 60, 50, 0.95); color: #d4c5b0; border: 3px solid #8b7355; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);">HOME</button>
+        <h1 class="title-text" style="font-size: clamp(2.5rem, 8vw, 5rem); margin-bottom: clamp(1.5rem, 4vh, 3rem);">PAUSED</h1>
+        <div class="flex flex-col" style="gap: clamp(12px, 2vh, 20px); width: clamp(16rem, 40vw, 20rem);">
+            <button id="resume-btn" class="pause-menu-btn" style="background: linear-gradient(135deg, #4a6741, #5a7a50); color: #d4c5b0; border: 3px solid #6b8055;">RESUME</button>
+            <button id="restart-pause-btn" class="pause-menu-btn" style="background: linear-gradient(135deg, #a83e20, #b44628); color: #d4c5b0; border: 3px solid #8b5a3c;">RESTART</button>
+            <button id="home-btn" class="pause-menu-btn" style="background: rgba(70, 60, 50, 0.95); color: #d4c5b0; border: 3px solid #8b7355;">HOME</button>
         </div>
     </div>
 
     <div id="gameover-screen" class="hidden">
-        <h1 class="text-5xl md:text-7xl font-black mb-4 title-text" style="text-shadow: 3px 3px 6px rgba(0,0,0,0.9), 0 0 20px rgba(255,0,0,0.4); color:#ff3333;">MISSION FAILED</h1>
-        <p id="go-score" class="text-3xl mb-10 font-mono tracking-wider" style="color: #d4c5b0; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">SCORE: 0</p>
-        <div class="flex flex-col gap-4 w-64">
-            <button id="restart-btn" class="px-10 py-3 font-bold rounded border transition hover:scale-105 cursor-pointer tracking-widest" style="background: linear-gradient(135deg, #4a6741, #5a7a50); color: #d4c5b0; border: 3px solid #6b8055; box-shadow: 2px 2px 15px rgba(0,0,0,0.6);">RETRY MISSION</button>
-            <button id="home-gameover-btn" class="px-10 py-3 font-bold rounded border transition hover:scale-105 cursor-pointer tracking-widest" style="background: rgba(70, 60, 50, 0.95); color: #d4c5b0; border: 3px solid #8b7355; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);">BACK TO HOME</button>
+        <h1 class="title-text" style="font-size: clamp(2.5rem, 8vw, 5rem); margin-bottom: clamp(0.5rem, 1vh, 1rem);">MISSION FAILED</h1>
+        <p id="go-score" class="font-mono tracking-wider" style="font-size: clamp(1.2rem, 4vw, 2rem); margin-bottom: clamp(1.5rem, 4vh, 3rem);">SCORE: 0</p>
+        <div class="flex flex-col" style="gap: clamp(12px, 2vh, 20px); width: clamp(16rem, 40vw, 20rem);">
+            <button id="restart-btn" class="pause-menu-btn" style="background: linear-gradient(135deg, #4a6741, #5a7a50); color: #d4c5b0; border: 3px solid #6b8055;">RETRY MISSION</button>
+            <button id="home-gameover-btn" class="pause-menu-btn" style="background: rgba(70, 60, 50, 0.95); color: #d4c5b0; border: 3px solid #8b7355;">BACK TO HOME</button>
         </div>
     </div>
 
-    <script src="js/demo.js"></script>
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="hidden">
+        <div class="victory-sparkles"></div>
+        <div class="victory-content">
+            <div class="victory-badge">
+                <div class="victory-trophy">🏆</div>
+                <div class="victory-rays"></div>
+            </div>
+            <h1 class="title-text victory-title">VICTORY!</h1>
+            <p class="victory-subtitle">OMEGA DESTROYER DEFEATED</p>
+            <div class="victory-stats">
+                <div class="victory-stat">
+                    <span class="stat-label">FINAL SCORE</span>
+                    <span id="victory-score" class="stat-value font-mono">0</span>
+                </div>
+                <div class="victory-stat">
+                    <span class="stat-label">MISSION TIME</span>
+                    <span id="victory-time" class="stat-value font-mono">00:00</span>
+                </div>
+            </div>
+            <div class="victory-btn-container">
+                <button id="home-victory-btn" class="victory-home-btn">
+                    <span class="btn-icon">🏠</span>
+                    <span class="btn-text">RETURN HOME</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deploy Confirmation Popup -->
+    <div id="deploy-confirm-popup" class="hidden">
+        <div class="confirm-popup-content">
+            <h2 class="confirm-title">⚠️ ACTIVE MISSION</h2>
+            <p class="confirm-text">You have a saved battle in progress. Starting a new mission will erase your current progress.</p>
+            <p class="confirm-subtext">Wave <span id="saved-wave-num">?</span> • Score <span id="saved-score-num">?</span></p>
+            <div class="confirm-buttons">
+                <button id="confirm-deploy-btn" class="pause-menu-btn" style="background: linear-gradient(135deg, #a83e20, #b44628); color: #d4c5b0; border: 3px solid #8b5a3c;">NEW MISSION</button>
+                <button id="cancel-deploy-btn" class="pause-menu-btn" style="background: rgba(70, 60, 50, 0.95); color: #d4c5b0; border: 3px solid #8b7355;">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/splash.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/world.js"></script>
-    <script src="js/gameplay.js"></script>
-    <script src="js/systems.js"></script>
-    <script src="js/render.js"></script>
+    <script src="js/achievements.js"></script>
+    <script src="js/saveManager.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/systems.js"></script>
+    <!-- render.js must load before gameplay.js (draw() dependency) -->
+    <script src="js/render.js"></script>
+    <!-- demo.js needs render.js, config.js, world.js -->
+    <script src="js/demo.js"></script>
+    <!-- systems.js must load before gameplay.js (updateBullets dependency) -->
+    <script src="js/gameplay.js"></script>
     <script src="js/input.js"></script>
     <script src="js/main.js"></script>
 </html>

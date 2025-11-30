@@ -120,11 +120,17 @@ const pursuitRadius = 1000 + (intelligence * 500); // Tier 0: 1500, Tier 4: 3500
 
 #### File Structure
 - **config.js** - Constants and configuration only
-- **systems.js** - Game logic and systems (AI, combat, loot)
+- **systems.js** - Game logic and systems (AI, combat, loot, boss)
 - **render.js** - Canvas rendering code only
 - **gameplay.js** - Game loop and state management
 - **ui.js** - HUD updates and UI interactions
 - **input.js** - Input handling (keyboard, mouse, touch)
+- **achievements.js** - Achievement system and tracking
+- **saveManager.js** - Save/Load game state persistence
+- **demo.js** - Homepage demo battle background
+- **splash.js** - Splash screen and loading
+- **world.js** - Map generation and spawning
+- **main.js** - Initialization and entry point
 
 ### Testing Your Changes
 

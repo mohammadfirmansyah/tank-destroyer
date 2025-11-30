@@ -1,208 +1,214 @@
 # 🎮 Tank Destroyer: Ultimate Edition
 
 [![GitHub](https://img.shields.io/badge/GitHub-tank--destroyer-blue?logo=github)](https://github.com/mohammadfirmansyah/tank-destroyer)
+[![Play Now](https://img.shields.io/badge/Play-Live%20Demo-brightgreen?logo=github)](https://mohammadfirmansyah.github.io/tank-destroyer/)
 [![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange?logo=html5)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A modern, action-packed top-down tank shooter built with pure JavaScript and HTML5 Canvas. Experience intense arcade-style combat with intelligent AI enemies, progressive weapon systems, and cinematic visual effects.
+An epic top-down tank shooter built with pure JavaScript and HTML5 Canvas. Battle through 12 waves of increasingly intelligent enemies, unlock 4 devastating Ultimate abilities, and face the mighty OMEGA DESTROYER boss in an action-packed 10,000×10,000 battlefield.
+
+## 🎮 Play Now
+
+**[▶️ Play Tank Destroyer](https://mohammadfirmansyah.github.io/tank-destroyer/)** - No download required!
 
 ## 📚 Documentation
 
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Learn how to contribute to the project
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[BUILD_INFO.md](BUILD_INFO.md)** - Build instructions and deployment guide
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+- **[BUILD_INFO.md](BUILD_INFO.md)** - Build and deployment guide
 
 ## ✨ Key Features
 
-- **🎯 Dynamic Combat System** - 9 unique weapons with distinct behaviors (Cannon, Twin, Shotgun, Railgun, Burst Rifle, Flak Cannon, Rocket Launcher, Plasma Beam, Gauss Rifle)
-- **🤖 Advanced AI** - 5-tier enemy intelligence system with pursuit mechanics, path-finding, and adaptive behavior
-- **💥 Visual Effects** - Cinematic particles, muzzle flashes, explosions, and screen shake
-- **🗺️ Smart Minimap** - Dynamic viewport that prevents edge clipping and shows tactical information
-- **📊 Progressive Loot System** - Rarity-based weapon drops (Common → Uncommon → Rare → Epic → Legendary → Mythic)
-- **🎨 Elegant UI** - Military-themed HUD with health bars, energy gauge, kill streak tracker, and weapon display
-- **📱 Cross-Platform** - Dual control scheme: WASD + Mouse for desktop, dual joysticks for mobile
-- **🏆 Local High Score** - Persistent score tracking with localStorage
-- **🎬 Splash Screen** - Professional 3-page intro with studio branding and health warning
+### 🔫 12 Unique Weapons (Tier 1-12)
+| Tier | Weapon | Type | Damage | Special |
+|------|--------|------|--------|---------|
+| 1 | Cannon | Single | 10 | Starter weapon |
+| 2 | Twin Cannon | Twin | 28 | Dual barrels |
+| 3 | Scatter Gun | Spread | 52 | 5-pellet shotgun |
+| 4 | Railgun | Sniper | 120 | High velocity pierce |
+| 5 | Burst Rifle | Burst | 95 | 3-round burst |
+| 6 | Frost Cannon | Ice | 85 | Slows enemies |
+| 7 | Inferno Gun | Fire | 110 | Burning DOT |
+| 8 | Flak Cannon | Explosive | 120 | Area damage |
+| 9 | Rocket Launcher | AOE | 250 | Massive explosion |
+| 10 | Tesla Rifle | Electric | 190 | Chain lightning |
+| 11 | Plasma Beam | Rapid | 52 | Ultra-fast fire |
+| 12 | Gauss Rifle | Pierce | 336 | Ultimate penetration |
 
-## 🎮 Gameplay Mechanics
+### 🤖 8-Tier Enemy System
+| Tier | Name | HP | Weapon | Special Ability |
+|------|------|-----|--------|-----------------|
+| 0 | Scout | 150 | Cannon | Basic AI |
+| 1 | Assault | 220 | Twin | Improved tracking |
+| 2 | Heavy | 320 | Shotgun | Tactical movement |
+| 3 | Elite | 500 | Burst | Magic Shield |
+| 4 | Commander | 800 | Plasma | Blink/Teleport |
+| 5 | Frost | 650 | Ice | Freezing aura |
+| 6 | Inferno | 700 | Fire | Burning attacks |
+| 7 | Tesla | 750 | Electric | Chain stun |
 
-### Combat System
-- **Energy Management** - Each weapon consumes energy; manage overheating to stay in the fight
-- **Recoil Physics** - Realistic weapon kickback affects aim and positioning
-- **Kill Streaks** - Build your streak to unlock devastating Ultimate abilities
-- **Armor & Shields** - Collect pickups to gain temporary invincibility and damage reduction
-- **Revive System** - Second chances to continue your mission
+### ⚡ 4 Ultimate Abilities
+| Wave | Ultimate | Effect |
+|------|----------|--------|
+| 1-3 | **DEVASTATOR** | Piercing beam (10 kills to charge) |
+| 4-6 | **SHOCKWAVE** | Area DOT + 2s stun (8 kills) |
+| 7-9 | **BERSERKER** | 12s rage: 2.5× damage, 2× speed, invincible (6 kills) |
+| 10+ | **CLONE ARMY** | Summon 3 ally tanks (10 kills) |
 
-### Enemy Tiers
-| Tier | Color | HP | Speed | Intelligence | Weapon |
-|------|-------|-----|-------|--------------|--------|
-| 0 | Yellow | 120 | 1.8 | Basic | Cannon |
-| 1 | Orange | 180 | 2.2 | Improved | Twin |
-| 2 | Pink | 250 | 2.6 | Tactical | Shotgun |
-| 3 | Red | 400 | 3.0 | Advanced | Burst |
-| 4 | Purple | 650 | 3.2 | Elite | Laser |
+### 👹 OMEGA DESTROYER Boss
+- **15,000 HP** with 3 phases (100% → 66% → 33%)
+- **7 Unique Turrets**: Void Lance, Frost Chain, Ember Volley, Storm Gatling, Arc Lance, Seeker Hive, Gravity Maul
+- **Special Attacks**: Dark Fire Aura, Headbutt Stun, Guard Escorts
+- **Ultimate Beam**: Triggered at 75%, 50%, 25% HP
 
-### AI Behavior
-- **Pursuit Mode** - Enemies chase the player aggressively based on tier intelligence (Tier 0: 1500 units, Tier 4: 3500 units)
-- **Obstacle Avoidance** - Smart pathfinding around walls and crates
-- **Predictive Targeting** - Higher-tier enemies lead their shots against moving targets
-- **Queue System** - Enemies coordinate attacks rather than swarming blindly
-- **Last Known Position Tracking** - Enemies search for the player when line of sight is lost
+### 🎯 Progressive Wave System
+- **12 Waves** of increasing difficulty
+- **15+ enemies per wave** (scales with progression)
+- **Revive Rewards**: Wave 3 (+1), Wave 6 (+2), Wave 9 (+3)
+- **Final Wave**: Face OMEGA DESTROYER with elite escorts
 
-## 🛠️ Technologies Used
+### 📦 Loot & Progression
+- **6-Tier Rarity**: Common → Uncommon → Rare → Epic → Legendary → Mythic
+- **Drop Types**: Weapons, Health, Energy, Armor, Damage Boost, Revives
+- **Smart Drops**: Only weapons at or above current tier
 
-- **HTML5 Canvas** - Hardware-accelerated 2D rendering
-- **Vanilla JavaScript** - Modular ES6+ architecture
-- **Tailwind CSS** - Utility-first styling framework
-- **LocalStorage API** - Client-side data persistence
+## 🛠️ Technologies
+
+- **HTML5 Canvas** - GPU-optimized 2D rendering with desynchronized context
+- **Vanilla JavaScript** - Modular ES6+ architecture (~15,000 lines)
+- **Tailwind CSS** - Utility-first styling
+- **LocalStorage** - Persistent high scores
 
 ## 📂 Project Structure
 
 ```
 tank-destroyer/
-├── tank-destroyer.html    # Main HTML entry point
+├── index.html          # Main game entry
 ├── css/
-│   └── style.css           # Game styling and UI themes
+│   └── style.css       # UI themes & animations
 ├── js/
-│   ├── config.js           # Global configuration and constants
-│   ├── world.js            # Map generation and world setup
-│   ├── gameplay.js         # Core game loop and state management
-│   ├── systems.js          # AI, combat, loot, and game systems
-│   ├── render.js           # Canvas rendering and visual effects
-│   ├── ui.js               # HUD updates and score display
-│   ├── input.js            # Keyboard, mouse, and touch controls
-│   ├── demo.js             # Homepage background demo battle
-│   ├── splash.js           # Splash screen animation system
-│   └── main.js             # Initialization and startup
-├── assets/                 # Game assets (if any)
-├── README.md               # This file
-├── CONTRIBUTING.md         # Contribution guidelines
-├── CHANGELOG.md            # Version history
-├── BUILD_INFO.md           # Build and deployment instructions
-└── LICENSE                 # MIT License
+│   ├── config.js       # Game constants, weapons, enemies, boss config
+│   ├── world.js        # Map generation, spawning
+│   ├── gameplay.js     # Core loop, player controls, ultimates
+│   ├── systems.js      # AI, combat, bullets, pathfinding
+│   ├── render.js       # Canvas rendering, particles, effects
+│   ├── ui.js           # HUD, minimap, menus
+│   ├── input.js        # Keyboard, mouse, touch controls
+│   ├── demo.js         # Homepage demo battle
+│   ├── splash.js       # Splash screen system
+│   ├── saveManager.js  # Save/load game state
+│   └── main.js         # Initialization
+├── assets/             # Game assets
+├── README.md
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+├── BUILD_INFO.md
+└── LICENSE             # MIT
 ```
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Modern web browser with HTML5 Canvas support (Chrome, Firefox, Edge, Safari)
-- No build tools or dependencies required
+### Play Online
+Visit **[mohammadfirmansyah.github.io/tank-destroyer](https://mohammadfirmansyah.github.io/tank-destroyer/)**
 
-### Running Locally
+### Run Locally
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/mohammadfirmansyah/tank-destroyer.git
-   cd tank-destroyer
-   ```
+```bash
+# Clone repository
+git clone https://github.com/mohammadfirmansyah/tank-destroyer.git
+cd tank-destroyer
 
-2. **Open in browser:**
-   ```bash
-   # Simply open the HTML file in your browser
-   start tank-destroyer.html  # Windows
-   open tank-destroyer.html   # macOS
-   xdg-open tank-destroyer.html  # Linux
-   ```
+# Option 1: Open directly
+start index.html          # Windows
+open index.html           # macOS
+xdg-open index.html       # Linux
 
-   Or use a local server (recommended):
-   ```bash
-   # Using Python
-   python -m http.server 8000
-   
-   # Using Node.js (http-server)
-   npx http-server -p 8000
-   ```
-
-3. **Play the game:**
-   - Navigate to `http://localhost:8000/tank-destroyer.html`
-   - Click through the splash screen
-   - Use WASD to move, mouse to aim and fire
-   - Survive as long as possible and beat your high score!
+# Option 2: Local server (recommended)
+python -m http.server 8000
+# Visit http://localhost:8000
+```
 
 ## 💻 Controls
 
 ### Desktop
-- **WASD** - Tank movement
-- **Mouse Move** - Aim turret
-- **Left Click / Space** - Fire weapon
-- **P / ESC** - Pause game
+| Key | Action |
+|-----|--------|
+| WASD | Move tank |
+| Mouse | Aim turret |
+| Left Click | Fire |
+| Arrow Keys | Aim + Auto-fire |
+| Space / Shift | Ultimate ability |
+| ESC / P | Pause |
 
 ### Mobile
-- **Left Joystick** - Tank movement
-- **Right Joystick** - Aim and fire
+- **Left Joystick** - Movement
+- **Right Joystick** - Aim & Fire (auto-fires while held)
+
+## 🧪 Debug Mode
+
+Set these in `js/config.js` for testing:
+
+```javascript
+DEBUG_START_WAVE = 12;        // Skip to wave (1-12)
+DEBUG_START_WEAPON = 'gauss'; // Start with weapon
+DEBUG_INVINCIBLE = true;      // God mode
+DEBUG_UNLIMITED_ENERGY = true;// No overheat
+```
 
 ## 🎯 Gameplay Tips
 
-1. **Energy Management** - Don't spam-fire; let your energy recharge to avoid overheating
-2. **Use Cover** - Destructible walls and crates provide tactical advantages
-3. **Weapon Progression** - Don't pick up weapons with lower rarity than your current weapon
-4. **Kill Streaks** - Build streaks to charge your Ultimate ability for devastating area damage
-5. **Mobility** - Higher-tier enemies are faster; keep moving to avoid getting cornered
-6. **Map Awareness** - Use the minimap to track enemy positions and avoid ambushes
+1. **Manage Heat** - Watch temperature gauge; overheat = 2s lockout
+2. **Use Cover** - Destructible walls regenerate HP over time
+3. **Build Streaks** - 10 kills = Ultimate ready
+4. **Prioritize Threats** - Magical enemies (Tier 3+) have special abilities
+5. **Boss Strategy** - Watch for turret patterns, dodge the beam ultimate
 
-## 📝 Code Highlights
+## 📖 Technical Highlights
 
-### Modular Architecture
-The codebase is split into logical modules for maintainability:
-- **config.js** - Centralized constants prevent magic numbers
-- **systems.js** - Pure functions for AI, loot, and combat logic
-- **render.js** - Isolated rendering code for easy optimization
+### GPU-Optimized Canvas
+```javascript
+const CTX = CANVAS.getContext('2d', { 
+    alpha: false,           // No transparency compositing
+    desynchronized: true,   // Async rendering
+    willReadFrequently: false
+});
+```
 
 ### Intelligent AI
-```javascript
-// Enemies adapt pursuit strategy based on intelligence level
-const pursuitRadius = 1000 + (intelligence * 500); // Tier 0: 1500, Tier 4: 3500
-const aggressivenessBonus = intelligence * 0.25;   // Up to +37.5% speed boost
+- **8 Intelligence Levels** with distinct behaviors
+- **A*-style Pathfinding** with stuck detection
+- **Predictive Targeting** for higher tiers
+- **Coordinated Attack Queues** prevent swarming
 
-// Predictive targeting for higher-tier enemies
-let timeToHit = d / bulletSpeed;
-let predictX = player.x + player.vx * timeToHit * 0.5;
-let predictY = player.y + player.vy * timeToHit * 0.5;
-```
-
-### Progressive Loot System
-```javascript
-// Weapons only drop if they're at or above player's current tier
-pool = pool.filter(w => 
-    w.rarity >= currentWeaponRarity && 
-    w.rarity <= currentWeaponRarity + 1 && 
-    w.id !== player.weapon  // No duplicate weapons
-);
-```
-
-## 📖 Learning Outcomes
-
-This project demonstrates:
-- ✅ **Game Loop Architecture** - RequestAnimationFrame-based update/render cycle
-- ✅ **Canvas Rendering** - Efficient 2D graphics with layered rendering
-- ✅ **State Management** - Centralized game state without frameworks
-- ✅ **AI Programming** - Behavior trees, pathfinding, and decision-making
-- ✅ **Physics Simulation** - Collision detection, projectile trajectories, recoil
-- ✅ **Input Handling** - Multi-platform control schemes (keyboard, mouse, touch)
-- ✅ **Particle Systems** - Dynamic visual effects for explosions and impacts
-- ✅ **Data Persistence** - LocalStorage for high score tracking
-- ✅ **Responsive Design** - Adaptive UI for desktop and mobile devices
+### Particle System
+- **Dynamic Effects**: Muzzle flash, explosions, trails
+- **Performance Capped**: Max particles limit
+- **Weapon-Specific**: Each weapon has unique visuals
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our **[Contributing Guide](CONTRIBUTING.md)** for details on how to submit a Pull Request.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+```bash
+# Fork, clone, branch
+git checkout -b feature/YourFeature
+git commit -m "feat: add YourFeature"
+git push origin feature/YourFeature
+# Open Pull Request
+```
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the **[LICENSE](LICENSE)** file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 👨‍💻 Developer
 
-- **Mohammad Firman Syah**
-- **Project Link:** [https://github.com/mohammadfirmansyah/tank-destroyer](https://github.com/mohammadfirmansyah/tank-destroyer)
+**Mohammad Firman Syah**
+
+- GitHub: [@mohammadfirmansyah](https://github.com/mohammadfirmansyah)
+- Project: [tank-destroyer](https://github.com/mohammadfirmansyah/tank-destroyer)
 
 ---
 
-**Built with ❤️ by Firman Dev Studio - Premium Interactive Entertainment**
+**Built with ❤️ using pure JavaScript & HTML5 Canvas**
