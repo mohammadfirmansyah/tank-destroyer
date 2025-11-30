@@ -498,11 +498,16 @@ function handleJoy(identifier, tx, ty, type, phase) {
 document.addEventListener(
     'touchstart',
     e => {
+        // Allow scrolling in achievement screen and other scrollable UI elements
+        const targetEl = e.target;
+        const scrollableParent = targetEl.closest('#achievements-screen, #settings-screen, .scrollable');
+        if (scrollableParent) return; // Don't intercept - allow native scroll
+        
         setInputMode(INPUT_MODE.TOUCH);
         let handled = false;
         for (let t of e.changedTouches) {
-            const targetEl = document.elementFromPoint(t.clientX, t.clientY);
-            const blockingEl = targetEl ? targetEl.closest('[id]') : null;
+            const pointEl = document.elementFromPoint(t.clientX, t.clientY);
+            const blockingEl = pointEl ? pointEl.closest('[id]') : null;
             if (blockingEl && blockingEl.id && blockingEl.id.includes('btn')) continue;
             handleJoy(t.identifier, t.clientX, t.clientY, 'auto', 'start');
             handled = true;
@@ -515,6 +520,11 @@ document.addEventListener(
 document.addEventListener(
     'touchmove',
     e => {
+        // Allow scrolling in achievement screen and other scrollable UI elements
+        const targetEl = e.target;
+        const scrollableParent = targetEl.closest('#achievements-screen, #settings-screen, .scrollable');
+        if (scrollableParent) return; // Don't intercept - allow native scroll
+        
         let handled = false;
         for (let t of e.changedTouches) {
             if (!touchJoystickMap.has(t.identifier)) continue;

@@ -107,6 +107,20 @@ function startGame() {
     // Stop demo battle background
     if (typeof stopDemo === 'function') stopDemo();
     
+    // CRITICAL: Force canvas resize before showing game to prevent mobile glitch
+    // This ensures canvas dimensions are correct before any rendering
+    if (typeof resize === 'function') {
+        // Reset last dimensions to force resize
+        if (typeof lastWidth !== 'undefined') lastWidth = 0;
+        if (typeof lastHeight !== 'undefined') lastHeight = 0;
+        resize();
+    }
+    
+    // CRITICAL: Reset frame timing state to ensure smooth start
+    // This prevents skipped frames or timing issues on game start
+    lastFrameTime = -1;
+    frameTimeAccumulator = 0;
+    
     // Add canvas fade-in effect
     const gameCanvas = document.getElementById('gameCanvas');
     gameCanvas.classList.add('active');

@@ -993,7 +993,8 @@ canvas {
 	position: relative;
 	z-index: 10;
 	opacity: 0;
-	transition: opacity 0.8s ease-in, filter 0.3s ease;
+	/* Faster transition on mobile to prevent glitch, smoother on desktop */
+	transition: opacity 0.3s ease-out, filter 0.3s ease;
 	/* GPU Hardware Acceleration - Force compositing layer */
 	transform: translateZ(0);
 	-webkit-transform: translateZ(0);
@@ -1005,6 +1006,8 @@ canvas {
 	-webkit-font-smoothing: none;
 	backface-visibility: hidden;
 	-webkit-backface-visibility: hidden;
+	/* Prevent layout shifts on mobile */
+	contain: layout style paint;
 }
 
 #gameCanvas.active {
@@ -4167,7 +4170,11 @@ body.touch-controls-hidden .joystick-container {
 	padding: clamp(20px, 4vh, 50px) clamp(15px, 4vw, 30px);
 	overflow-y: auto;
 	overflow-x: hidden;
+	/* Enable smooth touch scrolling on mobile */
 	-webkit-overflow-scrolling: touch;
+	overscroll-behavior: contain;
+	/* Ensure touch events are captured for scrolling */
+	touch-action: pan-y;
 }
 
 /* Custom scrollbar for achievements screen */
@@ -5652,23 +5659,23 @@ body.demo-active #ui-layer {
 
 .fps-hud {
 	position: fixed;
-	bottom: 20px;
+	bottom: 15px;
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 9999;
 	
 	/* Glassmorphism background with blur */
-	background: rgba(30, 25, 20, 0.5);
+	background: rgba(30, 25, 20, 0.6);
 	backdrop-filter: blur(8px);
 	-webkit-backdrop-filter: blur(8px);
 	
-	/* Elegant compact styling */
-	padding: 6px 12px;
-	border-radius: 5px;
-	border: 3px solid rgba(139, 115, 85, 0.7);
+	/* Compact styling - shorter and neater */
+	padding: 4px 10px;
+	border-radius: 4px;
+	border: 2px solid rgba(139, 115, 85, 0.6);
 	box-shadow: 
-		0 2px 8px rgba(0, 0, 0, 0.4),
-		inset 0 0 12px rgba(0, 0, 0, 0.2);
+		0 2px 6px rgba(0, 0, 0, 0.4),
+		inset 0 0 8px rgba(0, 0, 0, 0.2);
 	
 	/* Text styling */
 	font-family: 'Rajdhani', 'Consolas', monospace;
@@ -5676,10 +5683,12 @@ body.demo-active #ui-layer {
 	font-weight: 600;
 	letter-spacing: 0.3px;
 	white-space: nowrap;
+	line-height: 1.2;
 	
-	/* Flex layout for content */
+	/* Flex layout for evenly spaced content */
 	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: 0;
 	
 	/* Prevent interaction */
@@ -5693,16 +5702,16 @@ body.demo-active #ui-layer {
 /* FPS value - color coded dynamically via JS */
 .fps-hud .fps-value {
 	color: #a3e635;
-	min-width: 42px;
-	text-align: right;
+	min-width: 38px;
+	text-align: center;
 	text-shadow: 0 0 6px rgba(163, 230, 53, 0.4);
 	transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
-/* Separator styling - subtle */
+/* Separator styling - subtle and compact */
 .fps-hud .fps-separator {
-	color: rgba(139, 115, 85, 0.45);
-	margin: 0 6px;
+	color: rgba(139, 115, 85, 0.4);
+	margin: 0 5px;
 	font-weight: 400;
 	font-size: 9px;
 }
@@ -5710,15 +5719,15 @@ body.demo-active #ui-layer {
 /* Average FPS - muted tan */
 .fps-hud .fps-avg {
 	color: rgba(212, 197, 176, 0.85);
-	min-width: 40px;
-	text-align: right;
+	min-width: 36px;
+	text-align: center;
 }
 
 /* Frame time in ms - subtle */
 .fps-hud .fps-ms {
 	color: rgba(168, 153, 138, 0.8);
-	min-width: 44px;
-	text-align: right;
+	min-width: 38px;
+	text-align: center;
 }
 
 /* ===== FPS COLOR STATES ===== */

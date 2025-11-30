@@ -5,6 +5,29 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.6] - 2025-11-30
+
+### Fixed
+- 📱 **Mobile Game Start Glitch Fix** - Prevent visual glitch when entering battlefield
+  - Force canvas resize with dimension reset before showing game screen
+  - Reset frame timing state (lastFrameTime, frameTimeAccumulator) on game start
+  - Faster canvas fade-in transition (0.3s instead of 0.8s) to reduce visual artifacts
+  - Added CSS `contain: layout style paint` for layout stability
+- 📱 **Achievement Screen Mobile Scroll Fix** - Enable touch scrolling on mobile
+  - Added `touch-action: pan-y` CSS to allow vertical swipe gestures
+  - Added `overscroll-behavior: contain` to prevent scroll chaining
+  - Touch event handlers now skip achievement screen (allow native scroll)
+  - Touchstart/touchmove preventDefault skipped for scrollable UI elements
+- 🎯 **FPS Counter HUD Improvements** - Cleaner, more compact design
+  - Reduced height with smaller padding (4px vs 6px)
+  - Thinner border (2px vs 3px) for lighter visual weight
+  - Text now centered evenly within each section
+  - Reduced min-widths for tighter layout
+  - Added `line-height: 1.2` for better vertical alignment
+  - Added `justify-content: center` for even spacing
+
+---
+
 ## [2.0.0-RC.5] - 2025-11-30
 
 ### Added
