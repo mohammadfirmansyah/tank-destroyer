@@ -5,6 +5,28 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.12] - 2025-12-01
+
+### Fixed
+- 🏆 **Achievement Popup HUD Transparency Refined** - Only TOP HUD elements fade
+  - **Bug**: RC.11 made ALL HUD elements transparent including bottom controls
+  - **Expected**: Only top-screen HUD should fade, bottom controls stay visible
+  - **Fix**: Removed bottom control selectors from CSS rule
+    - ❌ Removed: `.controls-area`, `.controls-area *`, `.keyboard-hint`, `.ability-btn`
+    - ❌ Removed: `#ult-btn`, `#turbo-btn`, `#lifesteal-timer`, `#magnet-timer`, `.fps-hud`
+    - ✅ Kept: `.hud-top`, `.hud-top *`, `#wave-indicator`, `#wave-timer`, `#pause-btn`
+    - ✅ Kept: `.minimap-container`, `#minimap`
+  - **Result**: Joysticks, turbo button, ultimate button, FPS counter stay fully visible
+
+### Verified
+- ✅ **FPS Limiter System** - Correctly respects `DEBUG_FPS_LIMITER` flag
+  - When `DEBUG_FPS_LIMITER = true` → FPS capped at 60 (consistent gameplay)
+  - When `DEBUG_FPS_LIMITER = false` → FPS uncapped (runs at monitor refresh rate)
+  - Verified: No hidden FPS limitations during spawn sequence
+  - Physics uses FIXED_TIMESTEP (60Hz) for consistent game speed regardless of FPS
+
+---
+
 ## [2.0.0-RC.11] - 2025-12-01
 
 ### Fixed

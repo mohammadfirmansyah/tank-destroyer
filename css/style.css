@@ -5553,22 +5553,14 @@ body.achievements-open #turbo-btn {
 	transition: opacity 0.25s ease;
 }
 
-/* Make ALL HUD elements transparent when achievement popup notification is showing */
+/* Make TOP HUD elements transparent when achievement popup notification is showing */
+/* Only affects top-screen HUD (stats, minimap, wave indicator) - NOT bottom controls */
 /* Uses !important to override any inline styles or JS-set opacity values */
 body.achievement-popup-showing .hud-top,
 body.achievement-popup-showing .hud-top *,
-body.achievement-popup-showing .controls-area,
-body.achievement-popup-showing .controls-area *,
-body.achievement-popup-showing .keyboard-hint,
-body.achievement-popup-showing .ability-btn,
-body.achievement-popup-showing #ult-btn,
-body.achievement-popup-showing #turbo-btn,
-body.achievement-popup-showing #lifesteal-timer,
-body.achievement-popup-showing #magnet-timer,
 body.achievement-popup-showing #wave-indicator,
 body.achievement-popup-showing #wave-timer,
 body.achievement-popup-showing #pause-btn,
-body.achievement-popup-showing .fps-hud,
 body.achievement-popup-showing .minimap-container,
 body.achievement-popup-showing #minimap {
 	opacity: 0.25 !important;
