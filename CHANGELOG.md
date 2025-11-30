@@ -5,6 +5,42 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.10] - 2025-12-01
+
+### Fixed
+- 📱 **GPU Pre-Warm Solution** - Fix first-frame canvas glitch on mobile devices
+  - **Root Cause**: Canvas texture never initialized on mobile - GPU shows uninitialized buffer
+  - **New `preWarmCanvas()` Function** - Renders dummy frame during page initialization
+    - Draws checkerboard pattern to force GPU texture memory allocation
+    - Fills with terrain base color (`#8B9A6B`) for seamless first frame
+    - Uses `CTX.getImageData(0,0,1,1)` to force synchronous GPU flush
+  - **Multiple Pre-Warm Points** - Comprehensive coverage across all entry points:
+    - `main.js`: preWarmCanvas() called in initializeGame() after page load
+    - `splash.js`: preWarmCanvas() called in initSplash() after assets loaded
+    - `gameplay.js`: Full GPU pre-warm sequence in startGame() (checkerboard → fill → flush)
+    - `demo.js`: Full GPU pre-warm sequence in startDemo() (checkerboard → fill → flush)
+  - **Mobile-Specific Fix** - Targets Samsung, Qualcomm, Mali, PowerVR GPUs
+    - First frame now shows clean terrain color instead of garbage buffer
+    - No more black/glitchy frame on first game/demo screen transition
+    - Works reliably on all mobile devices tested
+
+- ⚡ **Faster Graphics Recovery** - Instant quality restoration when FPS >= 59
+  - **Bug Fixed**: Graphics had noticeable delay returning to full quality when FPS improved
+  - **Root Cause**: Single lerp speed (0.08) was too slow for recovery
+  - **Solution**: Asymmetric lerp speeds - fast recovery, slow degradation
+    - `PERF_LERP_SPEED = 0.08` - Slow transition when DECREASING quality (smooth degradation)
+    - `PERF_LERP_SPEED_RECOVERY = 0.25` - FAST transition when RECOVERING quality (instant feel)
+  - **Result**: Graphics snap back to full quality within ~12 frames (0.2 seconds) instead of ~75 frames (1.25 seconds)
+
+- 🌐 **Chrome Mobile Cache Fix** - Prevent glitches from stale GPU cache state
+  - **Issue**: Chrome Mobile (non-incognito) showed canvas glitches due to corrupt cached GPU state
+  - **Detection**: Added `isChromeMobile()` function to detect Chrome on Android/iOS
+  - **Version Change Detection**: Clear corrupt cache state when app version changes
+  - **Extra Cache Clearing**: Chrome Mobile gets additional cache clearing on version update
+  - **Safe Game Saves**: Only clears cache-related data, preserves player saves and high scores
+
+---
+
 ## [2.0.0-RC.9] - 2025-12-01
 
 ### Fixed

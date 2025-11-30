@@ -125,11 +125,22 @@ function startGame() {
     CTX.globalAlpha = 1.0;
     CTX.globalCompositeOperation = 'source-over';
     
-    // Step 4: Clear canvas with terrain base color (matches what draw() will render)
-    CTX.fillStyle = '#8B9A6B'; // Terrain base color
+    // Step 4: Pre-warm GPU with pattern (forces texture allocation)
+    CTX.fillStyle = '#7A8A5B';
+    for (let x = 0; x < CANVAS.width; x += 100) {
+        for (let y = 0; y < CANVAS.height; y += 100) {
+            CTX.fillRect(x, y, 50, 50);
+        }
+    }
+    
+    // Step 5: Fill with final terrain base color
+    CTX.fillStyle = '#8B9A6B';
     CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
-    // Step 5: Reset frame timing state for smooth start
+    // Step 6: Force synchronous GPU flush (ensures GPU processed all commands)
+    try { CTX.getImageData(0, 0, 1, 1); } catch(e) {}
+    
+    // Step 7: Reset frame timing state for smooth start
     lastFrameTime = -1;
     frameTimeAccumulator = 0;
     

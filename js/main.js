@@ -5,6 +5,57 @@ function initializeGame() {
     
     // Check for saved game and update continue button state
     updateContinueButtonState();
+    
+    // === MOBILE GPU PRE-WARM ===
+    // Pre-render a frame to canvas BEFORE user starts game
+    // This prevents "first frame glitch" on mobile devices where GPU shows
+    // uninitialized buffer before first real frame is rendered
+    preWarmCanvas();
+}
+
+// Pre-warm canvas to prevent first-frame glitch on mobile
+// Mobile GPUs may show garbage/black frame if canvas was never drawn to
+function preWarmCanvas() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!canvas || !ctx) return;
+    
+    // Step 1: Ensure canvas has proper dimensions
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Step 2: Reset context state
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // Step 3: Fill with terrain color (what the game will show)
+    ctx.fillStyle = '#8B9A6B';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Step 4: Draw a simple pattern to force GPU to initialize texture memory
+    // This "wakes up" the GPU compositor for this canvas
+    ctx.fillStyle = '#7A8A5B';
+    for (let x = 0; x < canvas.width; x += 100) {
+        for (let y = 0; y < canvas.height; y += 100) {
+            ctx.fillRect(x, y, 50, 50);
+        }
+    }
+    
+    // Step 5: Clear and fill again with base color
+    ctx.fillStyle = '#8B9A6B';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Step 6: Force GPU to process by reading a pixel (synchronous GPU flush)
+    // This ensures the GPU has fully processed our pre-warm frame
+    try {
+        ctx.getImageData(0, 0, 1, 1);
+    } catch (e) {
+        // Ignore errors (CORS issues on some browsers)
+    }
+    
+    console.log('[PreWarm] Canvas GPU initialized');
 }
 
 // Update continue button state based on save availability

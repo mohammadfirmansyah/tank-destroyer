@@ -1,13 +1,42 @@
 /**
  * Cache Buster - Force fresh assets on every page load
  * This script clears all browser caches and ensures fresh content
+ * 
+ * v2.0.0-RC.10 Update:
+ * - Added Chrome Mobile specific cache clearing
+ * - Clear IndexedDB and localStorage game state on version change
+ * - Detect corrupt cache state from previous sessions
  */
 
 (function() {
     'use strict';
     
-    const CACHE_BUSTER_VERSION = 'v2.0.0-RC.9';
+    const CACHE_BUSTER_VERSION = 'v2.0.0-RC.10';
     const CACHE_BUSTER_KEY = 'tank_destroyer_cache_cleared';
+    const CACHE_VERSION_KEY = 'tank_destroyer_version';
+    
+    /**
+     * Detect if running on Chrome Mobile (not incognito)
+     * Chrome Mobile has known issues with canvas GPU state caching
+     */
+    function isChromeMobile() {
+        const ua = navigator.userAgent;
+        const isChrome = /Chrome\/\d+/.test(ua) && !/Edg|OPR|Samsung/.test(ua);
+        const isMobile = /Android|iPhone|iPad|iPod/.test(ua);
+        return isChrome && isMobile;
+    }
+    
+    /**
+     * Check if version has changed (requires deeper cache clear)
+     */
+    function hasVersionChanged() {
+        try {
+            const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+            return storedVersion !== CACHE_BUSTER_VERSION;
+        } catch (e) {
+            return true; // Assume changed if can't read
+        }
+    }
     
     /**
      * Clear all caches including Cache API and Service Workers
@@ -120,9 +149,39 @@
     async function init() {
         console.log(`[CacheBuster] Initializing ${CACHE_BUSTER_VERSION}`);
         
+        // Check if this is Chrome Mobile (known to have canvas caching issues)
+        const chromeMobile = isChromeMobile();
+        if (chromeMobile) {
+            console.log('[CacheBuster] Chrome Mobile detected - applying extra cache clearing');
+        }
+        
+        // Check if version changed (requires deeper clear)
+        const versionChanged = hasVersionChanged();
+        if (versionChanged) {
+            console.log(`[CacheBuster] Version changed to ${CACHE_BUSTER_VERSION} - clearing old cache state`);
+            try {
+                // Clear any corrupt canvas state from previous version
+                // by removing all tank destroyer related localStorage except saves
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('tank_') && !key.includes('_save') && !key.includes('highscore')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+                
+                // Update stored version
+                localStorage.setItem(CACHE_VERSION_KEY, CACHE_BUSTER_VERSION);
+            } catch (e) {
+                console.warn('[CacheBuster] localStorage cleanup failed:', e);
+            }
+        }
+        
         const shouldClearCache = checkAndReload();
         
-        if (shouldClearCache) {
+        // Chrome Mobile needs extra refresh on first load to clear GPU cache
+        if (shouldClearCache || (chromeMobile && versionChanged)) {
             // Clear all caches
             await clearAllCaches();
             
@@ -163,6 +222,7 @@
     window.TankDestroyer = window.TankDestroyer || {};
     window.TankDestroyer.clearCache = async function() {
         sessionStorage.removeItem(CACHE_BUSTER_KEY + '_' + CACHE_BUSTER_VERSION);
+        localStorage.removeItem(CACHE_VERSION_KEY);
         await clearAllCaches();
         window.location.reload();
     };

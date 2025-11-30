@@ -54,14 +54,25 @@ function startDemo() {
     CANVAS.height = window.innerHeight;
     
     // === MOBILE GPU-SAFE DEMO INITIALIZATION ===
-    // Reset canvas context state (prevents GPU state corruption on mobile)
+    // Step 1: Reset canvas context state (prevents GPU state corruption on mobile)
     CTX.setTransform(1, 0, 0, 1, 0, 0);
     CTX.globalAlpha = 1.0;
     CTX.globalCompositeOperation = 'source-over';
     
-    // Fill canvas with terrain color to match draw() output
-    CTX.fillStyle = '#8B9A6B'; // Terrain base color
+    // Step 2: Pre-warm GPU with pattern (forces texture allocation on mobile)
+    CTX.fillStyle = '#7A8A5B';
+    for (let x = 0; x < CANVAS.width; x += 100) {
+        for (let y = 0; y < CANVAS.height; y += 100) {
+            CTX.fillRect(x, y, 50, 50);
+        }
+    }
+    
+    // Step 3: Fill with final terrain base color
+    CTX.fillStyle = '#8B9A6B';
     CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+    
+    // Step 4: Force synchronous GPU flush (ensures GPU processed all commands)
+    try { CTX.getImageData(0, 0, 1, 1); } catch(e) {}
     
     // FRUSTUM CULLING: Initialize viewport bounds immediately for particle system
     // This ensures visible particle counting works from the first frame

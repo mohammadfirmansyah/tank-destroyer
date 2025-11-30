@@ -268,7 +268,8 @@ let smoothPerfValues = {
     trackQuality: 1.0,
     wallDetail: 1.0
 };
-const PERF_LERP_SPEED = 0.08; // How fast values transition (0.08 = smooth, 0.2 = faster)
+const PERF_LERP_SPEED = 0.08; // How fast values transition when DECREASING quality
+const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING quality (instant feel)
 
 // Linear interpolation helper
 function lerpValue(current, target, speed) {
@@ -278,11 +279,16 @@ function lerpValue(current, target, speed) {
 }
 
 // Update smooth performance values - call every frame
+// Uses FAST lerp when recovering quality, SLOW lerp when degrading
 function updateSmoothPerfValues() {
     if (!DEBUG_SMART_PERFORMANCE) return;
     
     const target = getSmartPerfSettings();
-    const speed = PERF_LERP_SPEED;
+    
+    // Use FAST speed when recovering to full quality (target is higher than current)
+    // Use SLOW speed when degrading quality (target is lower than current)
+    const isRecovering = smartPerfLevel === 0;
+    const speed = isRecovering ? PERF_LERP_SPEED_RECOVERY : PERF_LERP_SPEED;
     
     smoothPerfValues.particleMultiplier = lerpValue(smoothPerfValues.particleMultiplier, target.particleMultiplier, speed);
     smoothPerfValues.maxParticles = Math.round(lerpValue(smoothPerfValues.maxParticles, target.maxParticles, speed));

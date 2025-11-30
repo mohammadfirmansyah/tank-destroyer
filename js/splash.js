@@ -59,6 +59,13 @@ function initSplash() {
     waitForAssets().then(() => {
         assetsLoaded = true;
         
+        // === MOBILE GPU PRE-WARM ===
+        // Pre-warm canvas BEFORE any game/demo starts
+        // This prevents "first frame glitch" on mobile devices
+        if (typeof preWarmCanvas === 'function') {
+            preWarmCanvas();
+        }
+        
         // Create particles immediately - they appear with loading bar
         createSplashParticles();
         
