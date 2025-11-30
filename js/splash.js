@@ -215,39 +215,54 @@ function dismissSplash() {
     // Add dramatic exit animation to container
     splashScreen.classList.add('dramatic-exit');
     
+    // IMPROVEMENT: Start demo early (behind splash) for seamless transition
+    // This ensures the demo background is already rendering when splash fades
+    if (typeof initDemo === 'function') {
+        initDemo();
+        console.log('[Splash] Demo started early for smooth transition');
+    }
+    
     // After initial effect, start fade out
     setTimeout(() => {
         splashScreen.classList.add('fade-out');
-    }, 800);
+    }, 600); // Reduced from 800ms for snappier feel
     
-    // After fade animation, remove splash and show homepage
+    // After fade animation, remove splash and show homepage UI
     setTimeout(() => {
         splashScreen.style.display = 'none';
         showHomepage();
-    }, 1800);
+    }, 1400); // Reduced from 1800ms (600 + 800 animation)
 }
 
 // Show homepage with demo battle background
 function showHomepage() {
-    // New demo uses main CANVAS, no need for separate demoCanvas
-    
-    // Start demo battle
-    if (typeof initDemo === 'function') {
-        initDemo();
-    }
+    // NOTE: Demo is now started early in dismissSplash() for smooth transition
+    // No need to call initDemo() here - it's already running behind the splash
     
     // Update score display
     if (typeof updateScoreDisplay === 'function') {
         updateScoreDisplay();
     }
     
-    // Show overlay menu with entrance animation
+    // Show overlay menu with smooth entrance animation
     const overlay = document.getElementById('overlay');
     if (overlay) {
+        // Ensure overlay starts invisible for smooth fade-in
+        overlay.style.opacity = '0';
         overlay.classList.remove('hidden');
+        
+        // Trigger reflow to ensure transition works
+        void overlay.offsetWidth;
+        
+        // Smooth fade in with transform
+        overlay.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+        overlay.style.opacity = '1';
         overlay.classList.add('menu-entrance');
+        
         setTimeout(() => {
             overlay.classList.remove('menu-entrance');
+            // Clean up inline styles after animation
+            overlay.style.transition = '';
         }, 600);
     }
 }

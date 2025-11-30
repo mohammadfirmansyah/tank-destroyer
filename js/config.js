@@ -136,7 +136,7 @@ const DEBUG_START_WAVE = null;
 // gauss, ice, fire, electric. Set to null to keep the default cannon.
 // Useful for: Testing specific weapon mechanics, balancing, visual effects.
 // Default: null (start with cannon)
-const DEBUG_START_WEAPON = null;
+const DEBUG_START_WEAPON = 'null';
 
 // DEBUG_UNLIMITED_HP: When true, player HP will never decrease from damage.
 // The player becomes invincible and cannot die from enemy attacks.

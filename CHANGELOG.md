@@ -5,6 +5,35 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-12-01
+
+### Fixed
+- 🎮 **Graphics Quality on Continue/Load** - Game now starts at full quality
+  - **Bug**: When loading saved game, graphics started at lowest setting then slowly improved
+  - **Root Cause**: `resetSmartPerformance()` was not called in `loadGame()`
+  - **Fix**: Added `resetSmartPerformance()` call in `saveManager.js` after loading save data
+  - **Result**: Continue/Load now immediately uses maximum graphics quality
+
+- ✨ **Splash to Homepage Transition** - Smoother, more seamless animation
+  - **Bug**: There was a noticeable gap/black frame between splash fade and homepage appearance
+  - **Root Cause**: Demo battle only started AFTER splash was completely gone
+  - **Improvements**:
+    - Demo now starts early (behind splash screen) for seamless background transition
+    - Reduced exit timing: 800ms → 600ms for snappier feel
+    - Total transition time: 1800ms → 1400ms (faster, smoother)
+    - Overlay now has proper opacity fade-in animation
+    - Added transform transition for menu entrance effect
+  - **Result**: No more black frame between splash and homepage
+
+### Technical Details
+- `saveManager.js`: Added `resetSmartPerformance()` call after save data restoration
+- `splash.js`:
+  - `dismissSplash()`: Now calls `initDemo()` early before splash fade-out
+  - `showHomepage()`: Removed duplicate `initDemo()` call, added smoother overlay transitions
+  - Exit timing reduced: 800ms → 600ms (initial delay), 1800ms → 1400ms (total)
+
+---
+
 ## [2.0.0-RC.13] - 2025-12-01
 
 ### Fixed

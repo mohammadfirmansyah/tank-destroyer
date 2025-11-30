@@ -177,6 +177,13 @@ function loadGame() {
 
         // Clear save after successful load to prevent loop
         localStorage.removeItem(SAVE_KEY);
+        
+        // CRITICAL: Reset graphics to full quality on load
+        // Without this, game starts at degraded quality from previous session
+        if (typeof resetSmartPerformance === 'function') {
+            resetSmartPerformance();
+            console.log('[loadGame] Smart performance reset to full quality');
+        }
 		
         // UI Updates
         document.getElementById('overlay').classList.add('hidden');
