@@ -1897,8 +1897,13 @@ function drawBulletShadow(x, y, width, height, bulletAngle, fadeAlpha, shape = '
     const shadowY = y + BULLET_SHADOW_OFFSET_Y;
     
     CTX.save();
-    CTX.filter = 'blur(3px)'; // Slightly more blur for natural shadow
-    CTX.fillStyle = `rgba(0, 0, 0, ${BULLET_SHADOW_ALPHA * fadeAlpha})`;
+    // Apply blur based on shadow quality
+    if (shadowQuality >= 0.7) {
+        CTX.filter = 'blur(3px)';
+    } else if (shadowQuality >= 0.4) {
+        CTX.filter = 'blur(1px)';
+    }
+    CTX.fillStyle = `rgba(0, 0, 0, ${BULLET_SHADOW_ALPHA * fadeAlpha * shadowQuality})`;
     CTX.translate(shadowX, shadowY);
     // Shadow always faces global shadow direction (bottom-right, 45 degrees)
     CTX.rotate(GLOBAL_SHADOW_ANGLE);
@@ -3447,33 +3452,40 @@ function drawElectricBullet(b, angle, fadeAlpha) {
     const tailLength = 48 * scale;
     const bodyLength = 24 * scale;
     
-    // Plasma teardrop shadow
-    CTX.save();
-    CTX.rotate(angle);
-    const shadowDist = 7;
-    const shadowAngle = Math.PI / 4;
-    CTX.translate(Math.cos(shadowAngle) * shadowDist, Math.sin(shadowAngle) * shadowDist);
-    CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    CTX.filter = 'blur(4px)';
-    
-    // Shadow teardrop shape - elegant curve
-    CTX.beginPath();
-    CTX.moveTo(-tailLength, 0);
-    CTX.bezierCurveTo(
-        -tailLength * 0.65, -5 * scale,
-        -bodyLength, -headRadius * 0.85,
-        -headRadius * 0.25, -headRadius * 0.92
-    );
-    CTX.arc(0, 0, headRadius, -Math.PI * 0.58, Math.PI * 0.58, false);
-    CTX.bezierCurveTo(
-        -headRadius * 0.25, headRadius * 0.92,
-        -bodyLength, headRadius * 0.85,
-        -tailLength, 0
-    );
-    CTX.closePath();
-    CTX.fill();
-    CTX.filter = 'none';
-    CTX.restore();
+    // Plasma teardrop shadow - skip at low shadow quality
+    const shadowQuality = getShadowQuality();
+    if (shadowQuality >= 0.3) {
+        CTX.save();
+        CTX.rotate(angle);
+        const shadowDist = 7;
+        const shadowAngle = Math.PI / 4;
+        CTX.translate(Math.cos(shadowAngle) * shadowDist, Math.sin(shadowAngle) * shadowDist);
+        CTX.fillStyle = `rgba(0, 0, 0, ${0.4 * shadowQuality})`;
+        if (shadowQuality >= 0.7) {
+            CTX.filter = 'blur(4px)';
+        } else if (shadowQuality >= 0.5) {
+            CTX.filter = 'blur(2px)';
+        }
+        
+        // Shadow teardrop shape - elegant curve
+        CTX.beginPath();
+        CTX.moveTo(-tailLength, 0);
+        CTX.bezierCurveTo(
+            -tailLength * 0.65, -5 * scale,
+            -bodyLength, -headRadius * 0.85,
+            -headRadius * 0.25, -headRadius * 0.92
+        );
+        CTX.arc(0, 0, headRadius, -Math.PI * 0.58, Math.PI * 0.58, false);
+        CTX.bezierCurveTo(
+            -headRadius * 0.25, headRadius * 0.92,
+            -bodyLength, headRadius * 0.85,
+            -tailLength, 0
+        );
+        CTX.closePath();
+        CTX.fill();
+        CTX.filter = 'none';
+        CTX.restore();
+    }
     
     CTX.rotate(angle);
     
@@ -3718,15 +3730,24 @@ function drawTank(x, y, angle, turretAngle, colorBody, colorTurret, isPlayer, re
     const shadowOffsetX = 5;
     const shadowOffsetY = 5;
     
-    // Draw body shadow with blur for soft edges (fixed direction)
-    CTX.save();
-    CTX.filter = 'blur(4px)';
-    CTX.translate(shadowOffsetX, shadowOffsetY);
-    CTX.rotate(angle);
-    CTX.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    CTX.fillRect(-26, -22, 52, 44);
-    CTX.filter = 'none';
-    CTX.restore();
+    // Get shadow quality for performance optimization
+    const shadowQuality = typeof getShadowQuality === 'function' ? getShadowQuality() : 1.0;
+    
+    // Draw body shadow with blur for soft edges (fixed direction) - skip at low quality
+    if (shadowQuality > 0.2) {
+        CTX.save();
+        if (shadowQuality >= 0.7) {
+            CTX.filter = 'blur(4px)';
+        } else if (shadowQuality >= 0.4) {
+            CTX.filter = 'blur(2px)';
+        }
+        CTX.translate(shadowOffsetX, shadowOffsetY);
+        CTX.rotate(angle);
+        CTX.fillStyle = `rgba(0, 0, 0, ${0.3 * shadowQuality})`;
+        CTX.fillRect(-26, -22, 52, 44);
+        CTX.filter = 'none';
+        CTX.restore();
+    }
     
     // Draw tank body with detailed treads/wheels
     CTX.save();
@@ -4314,24 +4335,31 @@ function drawTank(x, y, angle, turretAngle, colorBody, colorTurret, isPlayer, re
     // DYNAMIC TURRET SHADOW - Follows turret rotation but shadow direction is CONSISTENT
     // Light source is at top-left (-135 degrees), so shadow always casts to bottom-right
     // But the turret shape itself rotates, creating a realistic shadow
-    CTX.save();
-    
-    // Shadow is offset from light direction (top-left to bottom-right)
-    CTX.translate(shadowOffsetX, shadowOffsetY);
-    CTX.fillStyle = 'rgba(0, 0, 0, 0.25)';
-    
-    // Apply blur to turret shadow for soft realistic look
-    CTX.filter = isPlayer ? 'blur(4px)' : 'blur(3px)';
-    
-    // Draw weapon-specific turret shadow matching exact turret shape
-    CTX.save();
-    CTX.rotate(turretAngle);
-    drawWeaponTurretShadow(weaponType, recoil);
-    CTX.restore();
-    
-    // Reset filter
-    CTX.filter = 'none';
-    CTX.restore();
+    // Skip at low shadow quality for performance
+    if (shadowQuality > 0.2) {
+        CTX.save();
+        
+        // Shadow is offset from light direction (top-left to bottom-right)
+        CTX.translate(shadowOffsetX, shadowOffsetY);
+        CTX.fillStyle = `rgba(0, 0, 0, ${0.25 * shadowQuality})`;
+        
+        // Apply blur to turret shadow for soft realistic look - conditional on quality
+        if (shadowQuality >= 0.7) {
+            CTX.filter = isPlayer ? 'blur(4px)' : 'blur(3px)';
+        } else if (shadowQuality >= 0.4) {
+            CTX.filter = 'blur(2px)';
+        }
+        
+        // Draw weapon-specific turret shadow matching exact turret shape
+        CTX.save();
+        CTX.rotate(turretAngle);
+        drawWeaponTurretShadow(weaponType, recoil);
+        CTX.restore();
+        
+        // Reset filter
+        CTX.filter = 'none';
+        CTX.restore();
+    }
     
     // Draw turret with visual recoil offset
     // Apply visual turret recoil offset BEFORE rotation so turret shifts in firing direction
@@ -4906,12 +4934,20 @@ function drawCrate(c) {
     // Military-grade supply crate with silver/gold finish
     
     // Shadow with blur - same size as crate, offset to bottom-right
-    CTX.save();
-    CTX.filter = 'blur(3px)';
-    CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    CTX.fillRect(c.x + shadowOffsetX + shakeX, c.y + shadowOffsetY + shakeY, c.w, c.h);
-    CTX.filter = 'none';
-    CTX.restore();
+    // Skip shadow at low quality for performance
+    const shadowQuality = getShadowQuality();
+    if (shadowQuality >= 0.3) {
+        CTX.save();
+        if (shadowQuality >= 0.7) {
+            CTX.filter = 'blur(3px)';
+        } else if (shadowQuality >= 0.5) {
+            CTX.filter = 'blur(1px)';
+        }
+        CTX.fillStyle = `rgba(0, 0, 0, ${0.4 * shadowQuality})`;
+        CTX.fillRect(c.x + shadowOffsetX + shakeX, c.y + shadowOffsetY + shakeY, c.w, c.h);
+        CTX.filter = 'none';
+        CTX.restore();
+    }
     
     // Silver metallic base with gradient
     const silverGrad = CTX.createLinearGradient(c.x, c.y, c.x, c.y + c.h);
@@ -8780,14 +8816,22 @@ function draw() {
         }
         
         // Boss shadow with blur effect (global shadow direction: offset +4,+4)
-        CTX.save();
-        CTX.filter = 'blur(8px)';
-        CTX.fillStyle = 'rgba(0,0,0,0.5)';
-        CTX.beginPath();
-        CTX.arc(6, 6, boss.radius + 10, 0, Math.PI * 2);
-        CTX.fill();
-        CTX.filter = 'none';
-        CTX.restore();
+        // Skip shadow at low quality for performance
+        const bossBodyShadowQuality = getShadowQuality();
+        if (bossBodyShadowQuality >= 0.3) {
+            CTX.save();
+            if (bossBodyShadowQuality >= 0.7) {
+                CTX.filter = 'blur(8px)';
+            } else if (bossBodyShadowQuality >= 0.5) {
+                CTX.filter = 'blur(4px)';
+            }
+            CTX.fillStyle = `rgba(0,0,0,${0.5 * bossBodyShadowQuality})`;
+            CTX.beginPath();
+            CTX.arc(6, 6, boss.radius + 10, 0, Math.PI * 2);
+            CTX.fill();
+            CTX.filter = 'none';
+            CTX.restore();
+        }
         
         // Ultimate charging effect
         if (boss.ultimateState === 'charging') {
@@ -8912,16 +8956,23 @@ function draw() {
             CTX.globalAlpha = 1;
         }
         
-        // Boss shadow with blur effect
-        CTX.save();
-        CTX.filter = 'blur(6px)';
-        CTX.translate(8, 8); // Shadow offset
-        CTX.fillStyle = 'rgba(0, 0, 0, 0.35)';
-        CTX.beginPath();
-        CTX.arc(0, 0, boss.radius * 1.05, 0, Math.PI * 2);
-        CTX.fill();
-        CTX.filter = 'none';
-        CTX.restore();
+        // Boss shadow with blur effect - skip at low quality
+        const bossShadowQuality = getShadowQuality();
+        if (bossShadowQuality >= 0.3) {
+            CTX.save();
+            if (bossShadowQuality >= 0.7) {
+                CTX.filter = 'blur(6px)';
+            } else if (bossShadowQuality >= 0.5) {
+                CTX.filter = 'blur(3px)';
+            }
+            CTX.translate(8, 8); // Shadow offset
+            CTX.fillStyle = `rgba(0, 0, 0, ${0.35 * bossShadowQuality})`;
+            CTX.beginPath();
+            CTX.arc(0, 0, boss.radius * 1.05, 0, Math.PI * 2);
+            CTX.fill();
+            CTX.filter = 'none';
+            CTX.restore();
+        }
         
         // Boss main body (OMEGA DESTROYER - massive dark core)
         CTX.save();
@@ -9125,44 +9176,51 @@ function draw() {
             const activeTurretIndex = boss.activeTurretIndex !== undefined ? boss.activeTurretIndex : 0;
             const isSwitching = boss.turretSwitchCooldown > 0;
             
-            // First pass: Draw turret shadows with blur
-            boss.turrets.forEach((turret, index) => {
-                const turretConfig = BOSS_CONFIG.turrets[index];
-                if (!turretConfig) return;
-                
-                const turretWorldAngle = boss.angle + turret.angleOffset;
-                const turretDist = boss.radius - 25;
-                const turretX = Math.cos(turretWorldAngle) * turretDist;
-                const turretY = Math.sin(turretWorldAngle) * turretDist;
-                
-                // Shadow offset (consistent with global shadow direction)
-                const shadowOffset = 5;
-                
-                CTX.save();
-                CTX.translate(turretX + shadowOffset, turretY + shadowOffset);
-                
-                // Turret barrel rotation for shadow (world angle directly)
-                const barrelAngle = turret.turretAngle;
-                CTX.rotate(barrelAngle);
-                
-                // Apply blur to turret shadow
-                CTX.filter = 'blur(4px)';
-                CTX.fillStyle = 'rgba(0, 0, 0, 0.25)';
-                CTX.globalAlpha = 0.4;
-                
-                // Draw simplified turret shadow shape
-                // Mount shadow
-                CTX.beginPath();
-                CTX.arc(0, 0, 16, 0, Math.PI * 2);
-                CTX.fill();
-                
-                // Barrel shadow
-                CTX.fillRect(0, -5, 26, 10);
-                
-                CTX.filter = 'none';
-                CTX.globalAlpha = 1;
-                CTX.restore();
-            });
+            // First pass: Draw turret shadows with blur - skip at low quality
+            const turretShadowQuality = getShadowQuality();
+            if (turretShadowQuality >= 0.3) {
+                boss.turrets.forEach((turret, index) => {
+                    const turretConfig = BOSS_CONFIG.turrets[index];
+                    if (!turretConfig) return;
+                    
+                    const turretWorldAngle = boss.angle + turret.angleOffset;
+                    const turretDist = boss.radius - 25;
+                    const turretX = Math.cos(turretWorldAngle) * turretDist;
+                    const turretY = Math.sin(turretWorldAngle) * turretDist;
+                    
+                    // Shadow offset (consistent with global shadow direction)
+                    const shadowOffset = 5;
+                    
+                    CTX.save();
+                    CTX.translate(turretX + shadowOffset, turretY + shadowOffset);
+                    
+                    // Turret barrel rotation for shadow (world angle directly)
+                    const barrelAngle = turret.turretAngle;
+                    CTX.rotate(barrelAngle);
+                    
+                    // Apply blur to turret shadow based on quality
+                    if (turretShadowQuality >= 0.7) {
+                        CTX.filter = 'blur(4px)';
+                    } else if (turretShadowQuality >= 0.5) {
+                        CTX.filter = 'blur(2px)';
+                    }
+                    CTX.fillStyle = `rgba(0, 0, 0, ${0.25 * turretShadowQuality})`;
+                    CTX.globalAlpha = 0.4 * turretShadowQuality;
+                    
+                    // Draw simplified turret shadow shape
+                    // Mount shadow
+                    CTX.beginPath();
+                    CTX.arc(0, 0, 16, 0, Math.PI * 2);
+                    CTX.fill();
+                    
+                    // Barrel shadow
+                    CTX.fillRect(0, -5, 26, 10);
+                    
+                    CTX.filter = 'none';
+                    CTX.globalAlpha = 1;
+                    CTX.restore();
+                });
+            }
             
             // Second pass: Draw actual turrets
             boss.turrets.forEach((turret, index) => {

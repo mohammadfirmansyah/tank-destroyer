@@ -53,8 +53,9 @@ function startDemo() {
     CANVAS.width = window.innerWidth;
     CANVAS.height = window.innerHeight;
     
-    // CRITICAL: Clear canvas before starting demo to prevent glitch artifacts
-    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    // CRITICAL: Fill canvas with terrain color to prevent glitch artifacts
+    CTX.fillStyle = '#1a1a1a'; // Match terrain background color
+    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
     // FRUSTUM CULLING: Initialize viewport bounds immediately for particle system
     // This ensures visible particle counting works from the first frame
@@ -79,10 +80,8 @@ function startDemo() {
     camX = Math.max(demoAreaOffsetX, Math.min(player.x - CANVAS.width / 2, demoAreaOffsetX + DEMO_AREA_SIZE - CANVAS.width));
     camY = Math.max(demoAreaOffsetY, Math.min(player.y - CANVAS.height / 2, demoAreaOffsetY + DEMO_AREA_SIZE - CANVAS.height));
     
-    // Start demo loop with slight delay for clean transition
-    requestAnimationFrame(() => {
-        demoBattleLoop();
-    });
+    // Start demo loop
+    demoBattleLoop();
 }
 
 // Stop demo battle

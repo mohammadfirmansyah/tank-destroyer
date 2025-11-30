@@ -107,9 +107,13 @@ function startGame() {
     // Stop demo battle background
     if (typeof stopDemo === 'function') stopDemo();
     
-    // CRITICAL: Clear canvas before showing to prevent glitch artifacts
+    // CRITICAL: Remove active class first to reset opacity state
     const gameCanvas = document.getElementById('gameCanvas');
-    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    gameCanvas.classList.remove('active');
+    
+    // CRITICAL: Fill canvas with black first to prevent any glitch artifacts
+    CTX.fillStyle = '#1a1a1a'; // Match terrain background color
+    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
     // CRITICAL: Force canvas resize before showing game to prevent mobile glitch
     // This ensures canvas dimensions are correct before any rendering
@@ -125,13 +129,9 @@ function startGame() {
     lastFrameTime = -1;
     frameTimeAccumulator = 0;
     
-    // Clear canvas again after resize to ensure no artifacts
-    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
-    
-    // Add canvas fade-in effect with slight delay for clean transition
-    requestAnimationFrame(() => {
-        gameCanvas.classList.add('active');
-    });
+    // Fill canvas with terrain color again after resize
+    CTX.fillStyle = '#1a1a1a';
+    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
     // Show UI layer when game starts
     document.getElementById('ui-layer').classList.add('active');
@@ -228,6 +228,16 @@ function startGame() {
     }
 
     if (animationId) cancelAnimationFrame(animationId);
+    
+    // CRITICAL: Draw first frame BEFORE showing canvas to prevent glitch
+    // This ensures canvas has valid content before fade-in
+    draw();
+    
+    // Now show canvas with fade-in after first frame is rendered
+    requestAnimationFrame(() => {
+        gameCanvas.classList.add('active');
+    });
+    
     loop(performance.now());
 }
 

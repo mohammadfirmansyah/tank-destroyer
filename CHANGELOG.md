@@ -5,6 +5,41 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.8] - 2025-12-01
+
+### Fixed
+- 🌑 **Complete Shadow Optimization** - All shadows now respect quality settings
+  - Tank body shadow: Skip rendering if `shadowQuality < 0.3`
+  - Tank turret shadow: Skip rendering if `shadowQuality < 0.3`
+  - Bullet shadows (regular + shaped): Dynamic blur and opacity based on quality
+  - Plasma teardrop shadow: Skip if `shadowQuality < 0.3`, reduced blur at medium quality
+  - Supply crate shadow: Skip if `shadowQuality < 0.3`, reduced blur at medium quality
+  - Boss body shadow: Skip if `shadowQuality < 0.3`, blur reduced from 8px to 4px at medium
+  - Boss omega shadow: Skip if `shadowQuality < 0.3`, blur reduced from 6px to 3px at medium
+  - Boss turret shadows: Skip all 7 turret shadows if `shadowQuality < 0.3`
+- 🛤️ **Enemy & Clone Tank Tracks Optimization** - Tracks hidden at lowest quality
+  - All enemy tank tracks (including clone tanks) already respect `trackQuality`
+  - Tracks completely hidden when `trackQuality = 0` (emergency mode)
+  - Track rendering skipped entirely in lowest graphics settings
+- 📺 **Enhanced Canvas Glitch Prevention** - Improved transitions between screens
+  - Remove `canvas.active` class BEFORE clearing to prevent visible artifacts
+  - Fill canvas with terrain base color (`#8B9A6B`) before clear operation
+  - Double `requestAnimationFrame` for ultra-clean canvas show transition
+  - First frame render delay ensures content is ready before visibility
+  - Demo screen uses same robust canvas clearing pattern
+- 🎨 **Dynamic Shadow Quality Scaling** - Smoother quality degradation
+  - Blur intensity now scales with shadow quality (4px → 2px → none)
+  - Shadow opacity now scales with quality for gradual fade-out
+  - All shadow effects use `getShadowQuality()` for consistent behavior
+- 🔄 **Smooth Graphics Recovery** - All effects restore smoothly when FPS improves
+  - All quality values use `smoothPerfValues` with lerp interpolation
+  - `PERF_LERP_SPEED = 0.08` ensures buttery smooth transitions both ways
+  - Shadows gradually fade in when quality recovers from low to high
+  - Tracks reappear smoothly when `trackQuality` lerps from 0 to 1
+  - No sudden visual jumps when switching between quality levels
+
+---
+
 ## [2.0.0-RC.7] - 2025-11-30
 
 ### Fixed
