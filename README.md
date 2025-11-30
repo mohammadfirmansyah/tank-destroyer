@@ -88,6 +88,7 @@ tank-destroyer/
 ├── css/
 │   └── style.css       # UI themes & animations
 ├── js/
+│   ├── cache-buster.js # Cache management (auto-refresh)
 │   ├── config.js       # Game constants, weapons, enemies, boss config
 │   ├── world.js        # Map generation, spawning
 │   ├── gameplay.js     # Core loop, player controls, ultimates
@@ -97,9 +98,12 @@ tank-destroyer/
 │   ├── input.js        # Keyboard, mouse, touch controls
 │   ├── demo.js         # Homepage demo battle
 │   ├── splash.js       # Splash screen system
+│   ├── achievements.js # Achievement system & tracking
 │   ├── saveManager.js  # Save/load game state
+│   ├── tailwind.js     # Tailwind CSS (local)
 │   └── main.js         # Initialization
-├── assets/             # Game assets
+├── assets/
+│   └── fonts/          # Custom fonts (Rajdhani, Black Ops One)
 ├── README.md
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
