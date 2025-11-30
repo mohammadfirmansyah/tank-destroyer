@@ -219,6 +219,390 @@ const DEBUG_START_ITEMS = [];
 // Default: false (no FPS display)
 const DEBUG_SHOW_FPS = true;
 
+// DEBUG_FPS_LIMITER: When true, enables the 60 FPS frame rate limiter.
+// This caps the game at 60 FPS to save power and ensure consistent gameplay.
+// When false, the game runs at the monitor's refresh rate (uncapped).
+// Useful for: Testing performance on high refresh rate monitors, comparing capped vs uncapped.
+// Default: true (FPS limiter enabled)
+const DEBUG_FPS_LIMITER = false;
+
+// DEBUG_SMART_PERFORMANCE: When true, enables the Smart Performance Optimizer.
+// This system automatically detects FPS drops below 59 FPS and applies intelligent
+// optimizations to maintain stable frame rate without significantly affecting visuals.
+// Optimizations include: particle reduction, culling distance adjustment, effect simplification.
+// Useful for: Low-end devices, mobile browsers, maintaining 60 FPS target.
+// Default: true (Smart Performance enabled)
+const DEBUG_SMART_PERFORMANCE = true;
+
+// =============================================================================
+// SMART PERFORMANCE OPTIMIZER SYSTEM - COMPREHENSIVE BOTTLENECK DETECTION
+// =============================================================================
+// This system identifies and addresses ALL major sources of FPS drops:
+// 1. PARTICLES - Explosion effects, trails, sparks (GPU fill rate)
+// 2. TERRAIN - Background tiles with multiple layers (GPU overdraw)
+// 3. SHADOWS - blur() filters are VERY expensive on CPU/GPU
+// 4. TRACKS - Tank track bezier curves (CPU path calculations)
+// 5. ENEMIES - AI calculations, pathfinding (CPU heavy)
+// 6. BULLETS - Collision detection with walls/enemies (CPU)
+// 7. EFFECTS - Magic circles, auras, glows (GPU blending)
+// 8. WALLS/CRATES - Complex rendering with gradients (GPU)
+// =============================================================================
+
+// Performance optimizer state
+let smartPerfEnabled = DEBUG_SMART_PERFORMANCE;
+let smartPerfLevel = 0; // 0 = Full quality, 1-5 = Progressive optimization levels
+let smartPerfLastCheck = 0;
+let smartPerfCheckInterval = 400; // Check every 400ms (faster response)
+let smartPerfFPSHistory = [];
+let smartPerfHistorySize = 8; // Track last 8 FPS samples for faster response
+let smartPerfTargetFPS = 58; // Target FPS threshold (slightly below 60 for headroom)
+let smartPerfRecoveryFrames = 0; // Frames of good performance before recovering quality
+let smartPerfBottleneck = 'none'; // Current detected bottleneck type
+
+// Bottleneck detection counters (accumulated over check interval)
+let smartPerfMetrics = {
+    particleCount: 0,
+    enemyCount: 0,
+    bulletCount: 0,
+    trackCount: 0,
+    wallCount: 0,
+    effectCount: 0,
+    sampleCount: 0
+};
+
+// Update metrics each frame for bottleneck detection
+function updatePerfMetrics() {
+    if (!DEBUG_SMART_PERFORMANCE) return;
+    
+    // Safely get counts from game state
+    smartPerfMetrics.particleCount += (typeof particles !== 'undefined' ? particles.length : 0);
+    smartPerfMetrics.enemyCount += (typeof enemies !== 'undefined' ? enemies.filter(e => e.hp > 0).length : 0);
+    smartPerfMetrics.bulletCount += (typeof bullets !== 'undefined' ? bullets.length : 0);
+    smartPerfMetrics.trackCount += (typeof enemyTracks !== 'undefined' ? enemyTracks.length : 0);
+    smartPerfMetrics.wallCount += (typeof walls !== 'undefined' ? walls.length : 0);
+    smartPerfMetrics.effectCount += (typeof magicEffects !== 'undefined' ? magicEffects.length : 0);
+    smartPerfMetrics.sampleCount++;
+}
+
+// Detect primary bottleneck based on metrics
+function detectBottleneck() {
+    if (smartPerfMetrics.sampleCount === 0) return 'unknown';
+    
+    const avgParticles = smartPerfMetrics.particleCount / smartPerfMetrics.sampleCount;
+    const avgEnemies = smartPerfMetrics.enemyCount / smartPerfMetrics.sampleCount;
+    const avgBullets = smartPerfMetrics.bulletCount / smartPerfMetrics.sampleCount;
+    const avgTracks = smartPerfMetrics.trackCount / smartPerfMetrics.sampleCount;
+    const avgEffects = smartPerfMetrics.effectCount / smartPerfMetrics.sampleCount;
+    
+    // Thresholds for each bottleneck type
+    // Lower thresholds = earlier detection
+    const thresholds = {
+        particles: 150,  // Particles are expensive (GPU fill)
+        enemies: 15,     // AI calculations are expensive (CPU)
+        bullets: 50,     // Collision detection (CPU)
+        tracks: 200,     // Bezier curve rendering (CPU/GPU)
+        effects: 10      // Magic effects with blending (GPU)
+    };
+    
+    // Calculate "pressure" for each system (0-1 scale)
+    const pressures = {
+        particles: avgParticles / thresholds.particles,
+        enemies: avgEnemies / thresholds.enemies,
+        bullets: avgBullets / thresholds.bullets,
+        tracks: avgTracks / thresholds.tracks,
+        effects: avgEffects / thresholds.effects,
+        // Shadows/terrain are always potential bottlenecks
+        rendering: 0.5 // Base rendering pressure
+    };
+    
+    // Find highest pressure
+    let maxPressure = 0;
+    let bottleneck = 'rendering';
+    
+    for (const [type, pressure] of Object.entries(pressures)) {
+        if (pressure > maxPressure) {
+            maxPressure = pressure;
+            bottleneck = type;
+        }
+    }
+    
+    return bottleneck;
+}
+
+// Optimization settings per level (higher = more aggressive)
+// Now includes ALL performance-affecting settings
+const SMART_PERF_LEVELS = {
+    0: { // Full quality - no optimizations
+        particleMultiplier: 1.0,
+        maxParticles: 500,
+        cullDistance: 1500,
+        trailLength: 1.0,
+        effectDetail: 1.0,
+        shadowQuality: 1.0,      // Full shadow blur
+        terrainDetail: 1.0,     // All terrain details
+        trackQuality: 1.0,      // Full bezier curves
+        wallDetail: 1.0,        // Full wall rendering
+        aiUpdateRate: 1,        // Update AI every frame
+        description: 'Full Quality'
+    },
+    1: { // Slight reduction - barely noticeable
+        particleMultiplier: 0.85,
+        maxParticles: 350,
+        cullDistance: 1300,
+        trailLength: 0.85,
+        effectDetail: 0.9,
+        shadowQuality: 0.8,     // Reduced blur radius
+        terrainDetail: 0.9,     // Skip some grass blades
+        trackQuality: 0.9,      // Slightly simpler curves
+        wallDetail: 0.95,       // Slightly less detail
+        aiUpdateRate: 1,        // Still every frame
+        description: 'High Quality'
+    },
+    2: { // Moderate reduction - minor visual difference
+        particleMultiplier: 0.65,
+        maxParticles: 250,
+        cullDistance: 1100,
+        trailLength: 0.7,
+        effectDetail: 0.75,
+        shadowQuality: 0.5,     // Low blur
+        terrainDetail: 0.7,     // Skip pebbles & grass
+        trackQuality: 0.7,      // Simpler curves
+        wallDetail: 0.8,        // Skip some details
+        aiUpdateRate: 2,        // Update AI every 2 frames
+        description: 'Medium Quality'
+    },
+    3: { // Significant reduction - noticeable but playable
+        particleMultiplier: 0.45,
+        maxParticles: 150,
+        cullDistance: 900,
+        trailLength: 0.5,
+        effectDetail: 0.5,
+        shadowQuality: 0.3,     // Minimal blur
+        terrainDetail: 0.5,     // Basic terrain only
+        trackQuality: 0.5,      // Simple lines
+        wallDetail: 0.6,        // Basic walls
+        aiUpdateRate: 2,        // Every 2 frames
+        description: 'Low Quality'
+    },
+    4: { // Heavy reduction - performance priority
+        particleMultiplier: 0.3,
+        maxParticles: 100,
+        cullDistance: 700,
+        trailLength: 0.3,
+        effectDetail: 0.3,
+        shadowQuality: 0.1,     // Almost no blur
+        terrainDetail: 0.3,     // Flat colors only
+        trackQuality: 0.3,      // Straight lines
+        wallDetail: 0.4,        // Very basic
+        aiUpdateRate: 3,        // Every 3 frames
+        description: 'Very Low Quality'
+    },
+    5: { // Emergency mode - maximum performance
+        particleMultiplier: 0.15,
+        maxParticles: 50,
+        cullDistance: 500,
+        trailLength: 0.1,
+        effectDetail: 0.2,
+        shadowQuality: 0,       // No blur at all
+        terrainDetail: 0.1,     // Solid colors
+        trackQuality: 0,        // No tracks
+        wallDetail: 0.3,        // Minimal
+        aiUpdateRate: 4,        // Every 4 frames
+        description: 'Emergency Mode'
+    }
+};
+
+// Get current performance settings based on optimization level
+function getSmartPerfSettings() {
+    return SMART_PERF_LEVELS[smartPerfLevel] || SMART_PERF_LEVELS[0];
+}
+
+// Update Smart Performance Optimizer - call every 30 frames from game loop
+function updateSmartPerformance(currentFPS) {
+    if (!DEBUG_SMART_PERFORMANCE) return;
+    
+    const now = performance.now();
+    
+    // Accumulate metrics for bottleneck detection
+    updatePerfMetrics();
+    
+    // Only check at intervals to avoid overhead
+    if (now - smartPerfLastCheck < smartPerfCheckInterval) return;
+    smartPerfLastCheck = now;
+    
+    // Detect current bottleneck
+    smartPerfBottleneck = detectBottleneck();
+    
+    // Reset metrics for next interval
+    smartPerfMetrics = {
+        particleCount: 0,
+        enemyCount: 0,
+        bulletCount: 0,
+        trackCount: 0,
+        wallCount: 0,
+        effectCount: 0,
+        sampleCount: 0
+    };
+    
+    // Add current FPS to history
+    smartPerfFPSHistory.push(currentFPS);
+    if (smartPerfFPSHistory.length > smartPerfHistorySize) {
+        smartPerfFPSHistory.shift();
+    }
+    
+    // Need enough samples to make decisions
+    if (smartPerfFPSHistory.length < 4) return;
+    
+    // Calculate average FPS over recent history
+    const avgFPS = smartPerfFPSHistory.reduce((a, b) => a + b, 0) / smartPerfFPSHistory.length;
+    const minFPS = Math.min(...smartPerfFPSHistory);
+    
+    // Threshold: Graphics ONLY compromise when FPS drops BELOW 59
+    // Recovery: IMMEDIATE full quality when FPS is 59 or above
+    const fullQualityFPS = 59;    // >= 59 FPS = full quality (level 0)
+    const criticalFPS = 45;       // < 45 FPS = critical (jump multiple levels)
+    const warningFPS = 52;        // < 52 FPS = warning (increase 1 level)
+    
+    // PRIORITY 1: Immediate recovery when FPS >= 59
+    if (avgFPS >= fullQualityFPS && minFPS >= fullQualityFPS - 2) {
+        // FPS is 59+ - IMMEDIATELY restore full quality
+        if (smartPerfLevel > 0) {
+            smartPerfLevel = 0; // Instant recovery to full quality
+            smartPerfRecoveryFrames = 0;
+            if (DEBUG_SHOW_FPS) {
+                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0`);
+            }
+        }
+        return;
+    }
+    
+    // PRIORITY 2: Only optimize when FPS is BELOW 59
+    if (avgFPS < fullQualityFPS || minFPS < fullQualityFPS - 3) {
+        // FPS dropped below 59 - start compromising graphics
+        
+        if (minFPS < criticalFPS || avgFPS < criticalFPS) {
+            // CRITICAL: FPS very low, jump multiple levels
+            smartPerfRecoveryFrames = 0;
+            const levelsToJump = Math.min(2, 5 - smartPerfLevel);
+            if (levelsToJump > 0) {
+                smartPerfLevel += levelsToJump;
+                if (DEBUG_SHOW_FPS) {
+                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+                }
+            }
+        } else if (minFPS < warningFPS || avgFPS < warningFPS) {
+            // WARNING: FPS moderately low, increase 1 level
+            smartPerfRecoveryFrames = 0;
+            if (smartPerfLevel < 5) {
+                smartPerfLevel++;
+                if (DEBUG_SHOW_FPS) {
+                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+                }
+            }
+        } else {
+            // FPS between 52-58: mild optimization, try gradual recovery
+            smartPerfRecoveryFrames++;
+            
+            // Gradual recovery if FPS stabilizing in mid-range
+            if (smartPerfRecoveryFrames >= 3 && smartPerfLevel > 1) {
+                smartPerfLevel--;
+                smartPerfRecoveryFrames = 0;
+                if (DEBUG_SHOW_FPS) {
+                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel}`);
+                }
+            }
+        }
+    }
+}
+
+// === PERFORMANCE GETTER FUNCTIONS ===
+// Used by rendering code to get current optimization settings
+
+// Get particle count multiplier based on current optimization level
+function getParticleMultiplier() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().particleMultiplier;
+}
+
+// Get max particles limit based on current optimization level
+function getMaxParticles() {
+    if (!DEBUG_SMART_PERFORMANCE) return 500;
+    return getSmartPerfSettings().maxParticles;
+}
+
+// Get cull distance based on current optimization level
+function getCullDistance() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1500;
+    return getSmartPerfSettings().cullDistance;
+}
+
+// Get shadow quality (0 = no blur, 1 = full blur)
+function getShadowQuality() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().shadowQuality;
+}
+
+// Get terrain detail level (0 = solid colors, 1 = full detail)
+function getTerrainDetail() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().terrainDetail;
+}
+
+// Get track rendering quality (0 = no tracks, 1 = full bezier curves)
+function getTrackQuality() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().trackQuality;
+}
+
+// Get wall detail level
+function getWallDetail() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().wallDetail;
+}
+
+// Get AI update rate (1 = every frame, 2 = every 2 frames, etc)
+function getAIUpdateRate() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1;
+    return getSmartPerfSettings().aiUpdateRate;
+}
+
+// Get effect detail level (magic circles, auras, etc)
+function getEffectDetail() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().effectDetail;
+}
+
+// Get trail length multiplier
+function getTrailLength() {
+    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
+    return getSmartPerfSettings().trailLength;
+}
+
+// Console access for debugging
+function getPerfStatus() {
+    return {
+        enabled: DEBUG_SMART_PERFORMANCE,
+        level: smartPerfLevel,
+        description: getSmartPerfSettings().description,
+        bottleneck: smartPerfBottleneck,
+        settings: getSmartPerfSettings(),
+        fpsHistory: smartPerfFPSHistory,
+        avgFPS: smartPerfFPSHistory.length > 0 
+            ? (smartPerfFPSHistory.reduce((a, b) => a + b, 0) / smartPerfFPSHistory.length).toFixed(1)
+            : 'N/A'
+    };
+}
+
+// Global access for console debugging
+if (typeof window !== 'undefined') {
+    window.TankDestroyer = window.TankDestroyer || {};
+    window.TankDestroyer.perfStatus = getPerfStatus;
+    window.TankDestroyer.setPerfLevel = (level) => {
+        smartPerfLevel = Math.max(0, Math.min(5, level));
+        console.log(`[SmartPerf] Manual level set: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+    };
+}
+
 // =============================================================================
 // FPS COUNTER SYSTEM (Canvas-based HUD - only renders during gameplay)
 // =============================================================================

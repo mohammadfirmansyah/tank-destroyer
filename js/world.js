@@ -1,28 +1,118 @@
 // --- SETUP ---
 // Canvas is responsive so recalculating dimensions here keeps the arena view
 // matched to the browser window.
+
+// Mobile detection for special handling
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+let isResizing = false; // Prevent multiple rapid resize calls
+let resizeTimeout = null;
+let lastWidth = 0;
+let lastHeight = 0;
+
+// Robust resize function with mobile glitch prevention
 function resize() {
-    CANVAS.width = window.innerWidth;
-    CANVAS.height = window.innerHeight;
+    // Get actual viewport dimensions
+    const newWidth = window.innerWidth;
+    const newHeight = window.innerHeight;
+    
+    // Skip if dimensions haven't actually changed (prevents glitch loops)
+    if (newWidth === lastWidth && newHeight === lastHeight) return;
+    
+    // Update tracked dimensions
+    lastWidth = newWidth;
+    lastHeight = newHeight;
+    
+    // Apply dimensions to canvas
+    CANVAS.width = newWidth;
+    CANVAS.height = newHeight;
     
     // Reset joystick state on resize/orientation change to prevent input bugs
     if (typeof resetVirtualJoysticks === 'function') {
         resetVirtualJoysticks();
     }
+    
+    // Force re-render if game is active to prevent black screen
+    if (typeof state !== 'undefined' && state === 'GAME' && typeof draw === 'function') {
+        // Small delay to let browser settle
+        requestAnimationFrame(() => {
+            draw();
+        });
+    }
 }
 
-window.addEventListener('resize', resize);
+// Debounced resize for mobile - prevents rapid fire during orientation change
+function debouncedResize() {
+    if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+    }
+    
+    resizeTimeout = setTimeout(() => {
+        resize();
+        resizeTimeout = null;
+    }, isMobileDevice ? 150 : 50); // Longer delay on mobile
+}
+
+// Desktop resize - direct
+window.addEventListener('resize', () => {
+    if (isMobileDevice) {
+        debouncedResize();
+    } else {
+        resize();
+    }
+});
 
 // Handle orientation change specifically for mobile devices
 window.addEventListener('orientationchange', () => {
-    // Small delay to allow browser to complete orientation change
+    if (!isMobileDevice) return;
+    
+    // Mark that we're in a resize operation
+    isResizing = true;
+    
+    // Multiple staged resizes to handle browser quirks during orientation change
+    // Stage 1: Immediate (browser may not have updated dimensions yet)
     setTimeout(() => {
         resize();
-        // Force joystick recalculation after orientation stabilizes
+    }, 50);
+    
+    // Stage 2: After browser layout update
+    setTimeout(() => {
+        resize();
+        // Force joystick recalculation
         if (typeof resetVirtualJoysticks === 'function') {
             resetVirtualJoysticks();
         }
-    }, 100);
+    }, 150);
+    
+    // Stage 3: Final cleanup after animation completes
+    setTimeout(() => {
+        resize();
+        if (typeof resetVirtualJoysticks === 'function') {
+            resetVirtualJoysticks();
+        }
+        isResizing = false;
+    }, 500);
+});
+
+// Handle visibility change (tab switching, app backgrounding)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && isMobileDevice) {
+        // Coming back from background - may need resize
+        setTimeout(() => {
+            resize();
+            if (typeof resetVirtualJoysticks === 'function') {
+                resetVirtualJoysticks();
+            }
+        }, 100);
+    }
+});
+
+// Handle window focus (especially for PWA/fullscreen mode changes)
+window.addEventListener('focus', () => {
+    if (isMobileDevice) {
+        setTimeout(() => {
+            resize();
+        }, 100);
+    }
 });
 
 // --- INIT WORLD ---

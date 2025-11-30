@@ -450,9 +450,11 @@ let adaptiveQuality = 1.0; // 1.0 = full quality, lower = reduced effects
 // Caps frame rate at 60 FPS for consistent gameplay and power efficiency
 // Uses a robust timing approach that works on high refresh rate monitors (120Hz, 144Hz, etc.)
 // TARGET_FPS and FRAME_TIME are defined in config.js
+// DEBUG_FPS_LIMITER controls whether the limiter is active
 const FRAME_MIN_TIME = FRAME_TIME; // Use FRAME_TIME from config.js (16.67ms for 60fps)
 let lastFrameTime = -1; // Initialize to -1 to ensure first frame always runs
 let frameTimeAccumulator = 0; // Accumulates fractional frame time for precision
+let currentRealFPS = 60; // Track actual FPS for Smart Performance Optimizer
 
 // === FIXED TIMESTEP SYSTEM ===
 // Accumulates time and runs physics in fixed steps to ensure consistent speed
@@ -470,34 +472,44 @@ function loop(timestamp) {
     // Schedule next frame immediately (let browser handle timing)
     animationId = requestAnimationFrame(loop);
     
-    // === FPS LIMITER (Robust for high refresh rate monitors) ===
-    // Initialize lastFrameTime on first frame
-    if (lastFrameTime < 0) {
+    // === FPS LIMITER (Controlled by DEBUG_FPS_LIMITER) ===
+    // When enabled, caps frame rate at 60 FPS for consistent gameplay
+    // When disabled, runs at monitor's native refresh rate
+    if (DEBUG_FPS_LIMITER) {
+        // Initialize lastFrameTime on first frame
+        if (lastFrameTime < 0) {
+            lastFrameTime = timestamp;
+            lastTime = timestamp;
+            return; // Skip first frame to establish baseline
+        }
+        
+        // Calculate time since last rendered frame
+        const deltaTime = timestamp - lastFrameTime;
+        
+        // Accumulate time - this handles fractional frame times properly
+        frameTimeAccumulator += deltaTime;
         lastFrameTime = timestamp;
-        lastTime = timestamp;
-        return; // Skip first frame to establish baseline
-    }
-    
-    // Calculate time since last rendered frame
-    const deltaTime = timestamp - lastFrameTime;
-    
-    // Accumulate time - this handles fractional frame times properly
-    frameTimeAccumulator += deltaTime;
-    lastFrameTime = timestamp;
-    
-    // Only process frame if enough time has accumulated (16.67ms for 60 FPS)
-    // Using >= instead of > and subtracting FRAME_MIN_TIME for precision
-    if (frameTimeAccumulator < FRAME_MIN_TIME) {
-        return; // Skip this frame, not enough time accumulated
-    }
-    
-    // Consume the frame time (keep remainder for next frame)
-    // This ensures we don't drift over time
-    frameTimeAccumulator -= FRAME_MIN_TIME;
-    
-    // Cap accumulator to prevent spiral if we fall behind
-    if (frameTimeAccumulator > FRAME_MIN_TIME) {
-        frameTimeAccumulator = 0; // Reset if we're more than 1 frame behind
+        
+        // Only process frame if enough time has accumulated (16.67ms for 60 FPS)
+        if (frameTimeAccumulator < FRAME_MIN_TIME) {
+            return; // Skip this frame, not enough time accumulated
+        }
+        
+        // Consume the frame time (keep remainder for next frame)
+        frameTimeAccumulator -= FRAME_MIN_TIME;
+        
+        // Cap accumulator to prevent spiral if we fall behind
+        if (frameTimeAccumulator > FRAME_MIN_TIME) {
+            frameTimeAccumulator = 0;
+        }
+    } else {
+        // FPS limiter disabled - initialize lastFrameTime if needed
+        if (lastFrameTime < 0) {
+            lastFrameTime = timestamp;
+            lastTime = timestamp;
+            return;
+        }
+        lastFrameTime = timestamp;
     }
     
     // Calculate elapsed time since last processed frame
@@ -509,6 +521,15 @@ function loop(timestamp) {
     perfTotalTime += elapsed;
     if (perfFrameCount >= 30) {
         avgFrameTime = perfTotalTime / perfFrameCount;
+        
+        // Calculate current real FPS for Smart Performance Optimizer
+        currentRealFPS = 1000 / avgFrameTime;
+        
+        // Update Smart Performance Optimizer with current FPS
+        if (typeof updateSmartPerformance === 'function') {
+            updateSmartPerformance(currentRealFPS);
+        }
+        
         perfFrameCount = 0;
         perfTotalTime = 0;
         

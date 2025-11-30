@@ -544,10 +544,14 @@ const DEMO_MAX_ACCUMULATED = 100;
 let demoAccumulatedTime = 0;
 
 // === FPS LIMITER FOR DEMO (Robust for high refresh rate monitors) ===
+// Uses DEBUG_FPS_LIMITER from config.js to control whether limiter is active
 const DEMO_TARGET_FPS = 60;
 const DEMO_FRAME_MIN_TIME = 1000 / DEMO_TARGET_FPS;
 let demoLastFrameTime = -1; // Initialize to -1 for first frame detection
 let demoFrameTimeAccumulator = 0; // Accumulates fractional frame time
+let demoCurrentFPS = 60; // Track current FPS for Smart Performance Optimizer
+let demoPerfFrameCount = 0;
+let demoPerfTotalTime = 0;
 
 // Main demo battle loop - uses fixed timestep for consistent speed
 function demoBattleLoop() {
@@ -558,32 +562,61 @@ function demoBattleLoop() {
     
     const now = performance.now();
     
-    // === FPS LIMITER (Robust for 120Hz/144Hz/240Hz monitors) ===
-    // Initialize on first frame
-    if (demoLastFrameTime < 0) {
+    // === FPS LIMITER (Controlled by DEBUG_FPS_LIMITER from config.js) ===
+    if (typeof DEBUG_FPS_LIMITER !== 'undefined' && DEBUG_FPS_LIMITER) {
+        // Initialize on first frame
+        if (demoLastFrameTime < 0) {
+            demoLastFrameTime = now;
+            demoLastTime = now;
+            return; // Skip first frame to establish baseline
+        }
+        
+        // Calculate delta and accumulate
+        const deltaTime = now - demoLastFrameTime;
+        demoFrameTimeAccumulator += deltaTime;
         demoLastFrameTime = now;
-        demoLastTime = now;
-        return; // Skip first frame to establish baseline
-    }
-    
-    // Calculate delta and accumulate
-    const deltaTime = now - demoLastFrameTime;
-    demoFrameTimeAccumulator += deltaTime;
-    demoLastFrameTime = now;
-    
-    // Only process if enough time accumulated (16.67ms for 60 FPS)
-    if (demoFrameTimeAccumulator < DEMO_FRAME_MIN_TIME) {
-        return; // Skip, not enough time
-    }
-    
-    // Consume frame time, keep remainder for precision
-    demoFrameTimeAccumulator -= DEMO_FRAME_MIN_TIME;
-    if (demoFrameTimeAccumulator > DEMO_FRAME_MIN_TIME) {
-        demoFrameTimeAccumulator = 0; // Reset if behind
+        
+        // Only process if enough time accumulated (16.67ms for 60 FPS)
+        if (demoFrameTimeAccumulator < DEMO_FRAME_MIN_TIME) {
+            return; // Skip, not enough time
+        }
+        
+        // Consume frame time, keep remainder for precision
+        demoFrameTimeAccumulator -= DEMO_FRAME_MIN_TIME;
+        if (demoFrameTimeAccumulator > DEMO_FRAME_MIN_TIME) {
+            demoFrameTimeAccumulator = 0; // Reset if behind
+        }
+    } else {
+        // FPS limiter disabled - just track timing
+        if (demoLastFrameTime < 0) {
+            demoLastFrameTime = now;
+            demoLastTime = now;
+            return;
+        }
+        demoLastFrameTime = now;
     }
     
     const elapsed = now - demoLastTime;
     demoLastTime = now;
+    
+    // === SMART PERFORMANCE OPTIMIZER (For Demo) ===
+    // Track FPS and call optimizer every 30 frames
+    demoPerfFrameCount++;
+    demoPerfTotalTime += elapsed;
+    if (demoPerfFrameCount >= 30) {
+        const avgFrameTime = demoPerfTotalTime / demoPerfFrameCount;
+        demoCurrentFPS = 1000 / avgFrameTime;
+        
+        // Update Smart Performance Optimizer if enabled
+        if (typeof DEBUG_SMART_PERFORMANCE !== 'undefined' && DEBUG_SMART_PERFORMANCE) {
+            if (typeof updateSmartPerformance === 'function') {
+                updateSmartPerformance(demoCurrentFPS);
+            }
+        }
+        
+        demoPerfFrameCount = 0;
+        demoPerfTotalTime = 0;
+    }
     
     // Fixed timestep accumulator - prevents speed-up during lag
     demoAccumulatedTime += elapsed;

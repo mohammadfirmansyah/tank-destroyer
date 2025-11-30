@@ -5,6 +5,84 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.5] - 2025-11-30
+
+### Added
+- 🔧 **DEBUG_FPS_LIMITER** - Toggle variable to enable/disable FPS limiter (default: `true`)
+  - Set to `false` in config.js to disable 60 FPS cap for testing
+  - Easy toggle without code changes for performance comparison
+- 🧠 **Smart Performance Optimizer v2** - Comprehensive bottleneck detection and optimization
+  - `DEBUG_SMART_PERFORMANCE` toggle variable (default: `true`)
+  - **Bottleneck Detection System** - Identifies the real source of FPS drops:
+    - Particles (GPU fill rate)
+    - Enemies (CPU - AI calculations)
+    - Bullets (CPU - collision detection)
+    - Tracks (CPU/GPU - bezier curve rendering)
+    - Effects (GPU - magic circles, auras)
+    - Rendering (GPU - shadows, terrain detail)
+  - **6 Optimization Levels** (0-5): Full Quality → Emergency Mode
+  - **Per-System Optimization Settings**:
+    - `particleMultiplier` - Reduce particle spawn rate
+    - `maxParticles` - Hard cap on active particles
+    - `shadowQuality` - Blur radius reduction (blur() is expensive!)
+    - `terrainDetail` - Skip grass blades, pebbles, tire marks
+    - `trackQuality` - Use simple lines instead of bezier curves
+    - `wallDetail` - Simplified wall rendering
+    - `aiUpdateRate` - Skip AI updates (every 2-4 frames)
+    - `effectDetail` - Reduce magic effect complexity
+  - **Console Access**: `TankDestroyer.perfStatus()` for real-time monitoring
+  - **Manual Override**: `TankDestroyer.setPerfLevel(0-5)` for testing
+  - **Smart Threshold System** (improved):
+    - Full quality (level 0) maintained when FPS ≥ 59
+    - Graphics ONLY compromise when FPS drops BELOW 59
+    - **Instant recovery** to full quality when FPS returns to 59+
+    - Critical threshold: < 45 FPS (jump multiple levels)
+    - Warning threshold: < 52 FPS (increase 1 level)
+    - Gradual recovery in mid-range (52-58 FPS)
+
+### Fixed
+- 📱 **Mobile Browser Glitch Fix** - Complete overhaul of resize handling
+  - Added mobile device detection for special handling
+  - Debounced resize events (150ms on mobile) to prevent rapid-fire calls
+  - Multi-stage orientation change handling (50ms, 150ms, 500ms delays)
+  - Skip resize if dimensions haven't actually changed (prevents glitch loops)
+  - Added visibility change handler for tab switching/app backgrounding
+  - Added window focus handler for PWA/fullscreen mode changes
+  - Force re-render after resize if game is active (prevents black screen)
+- 🎨 **Shadow Blur Optimization** - blur() filter is now conditional
+  - Full blur at high quality (3px radius)
+  - Reduced blur at medium quality (1-2px radius)
+  - Simple rectangle shadow at low quality (no blur)
+- 🏗️ **Track Rendering Optimization**
+  - Bezier curves used only at quality >= 0.5
+  - Simple straight lines at low quality (much faster)
+  - Skip tracks entirely in emergency mode (quality = 0)
+- 🌿 **Terrain Detail Optimization**
+  - Skip grass blades at quality < 0.7
+  - Skip pebbles at quality < 0.5
+  - Skip tire marks at quality < 0.8
+  - Skip shadows/highlights at quality < 0.6/0.9
+  - Solid colors only in emergency mode
+
+### Changed
+- 🔧 FPS limiter now conditional on `DEBUG_FPS_LIMITER` flag (game + demo)
+- 🔧 Performance monitoring integrated into game loop (every 30 frames)
+- 🔧 Enhanced `resize()` function with dimension tracking
+- 🔧 Demo battle also uses Smart Performance Optimizer
+- 💥 **Bullet Rendering Optimization** - Major FPS improvement
+  - Motion blur ghost count reduced from 10 to `ceil(10 * quality)`
+  - Simple gradient streak used instead of ghosts at low quality
+  - Skip motion blur entirely when `effectDetail < 0.3`
+  - Bullet shadows skip blur filter at `shadowQuality < 0.7`
+  - Skip bullet shadows entirely at `shadowQuality < 0.2`
+  - **Bullet Render Cap** - Limit max bullets drawn based on quality:
+    - Full quality: All bullets rendered
+    - Medium quality: Max 80 bullets
+    - Low quality: Max 40 bullets (excess drawn as simple dots)
+  - Motion blur call skipped when `effectDetail < 0.4` (saves CPU)
+
+---
+
 ## [2.0.0-RC.4] - 2025-11-30
 
 ### Fixed

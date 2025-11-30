@@ -1729,6 +1729,10 @@ function drawBulletMotionBlur(b, color, fadeAlpha, blurLength = null, blurIntens
     if (!b || typeof b.x !== 'number' || typeof b.y !== 'number') return;
     if (!b.vx && !b.vy) return; // No velocity = no motion blur
     
+    // === PERFORMANCE OPTIMIZATION: Check effect detail level ===
+    const effectDetail = typeof getEffectDetail === 'function' ? getEffectDetail() : 1.0;
+    if (effectDetail < 0.3) return; // Skip motion blur entirely in emergency mode
+    
     // Validate color is a string, use default if not
     const colorStr = (typeof color === 'string') ? color : '#ffffff';
     
@@ -1741,8 +1745,36 @@ function drawBulletMotionBlur(b, color, fadeAlpha, blurLength = null, blurIntens
     const actualBlurLength = blurLength || Math.min(speed * 2.5, 80);
     const bulletAngle = Math.atan2(b.vy, b.vx);
     
-    // Number of ghost images (more = smoother but heavier)
-    const ghostCount = Math.min(10, Math.floor(actualBlurLength / 5) + 3);
+    // === OPTIMIZED: Reduce ghost count based on effect detail ===
+    // Full quality: 10 ghosts, Low quality: 3 ghosts, Emergency: 0 (skipped above)
+    const maxGhosts = Math.ceil(10 * effectDetail);
+    const ghostCount = Math.min(maxGhosts, Math.floor(actualBlurLength / 5) + 3);
+    
+    // Skip ghost rendering if too few (just draw streak instead)
+    if (ghostCount < 2 || effectDetail < 0.5) {
+        // SIMPLE MODE: Just draw a streak line (much faster)
+        let r = 128, g = 128, bl = 128;
+        if (colorStr.startsWith('#')) {
+            const hex = colorStr.slice(1);
+            if (hex.length === 6) {
+                r = parseInt(hex.slice(0, 2), 16);
+                g = parseInt(hex.slice(2, 4), 16);
+                bl = parseInt(hex.slice(4, 6), 16);
+            }
+        }
+        
+        CTX.save();
+        CTX.globalAlpha = fadeAlpha * blurIntensity * 0.5;
+        CTX.strokeStyle = `rgb(${r}, ${g}, ${bl})`;
+        CTX.lineWidth = (b.size || 5) * 0.8;
+        CTX.lineCap = 'round';
+        CTX.beginPath();
+        CTX.moveTo(b.x - Math.cos(bulletAngle) * actualBlurLength * 0.6, b.y - Math.sin(bulletAngle) * actualBlurLength * 0.6);
+        CTX.lineTo(b.x, b.y);
+        CTX.stroke();
+        CTX.restore();
+        return;
+    }
     
     CTX.save();
     
@@ -1799,7 +1831,8 @@ function drawBulletMotionBlur(b, color, fadeAlpha, blurLength = null, blurIntens
     }
     
     // Draw continuous blur streak for all moving bullets (lowered threshold)
-    if (speed > 5) {
+    // Only draw streak at high quality
+    if (speed > 5 && effectDetail >= 0.7) {
         const streakGrad = CTX.createLinearGradient(
             b.x - Math.cos(bulletAngle) * actualBlurLength,
             b.y - Math.sin(bulletAngle) * actualBlurLength,
@@ -1833,18 +1866,27 @@ function drawBulletMotionBlur(b, color, fadeAlpha, blurLength = null, blurIntens
 // Shadow is drawn as an ellipse that's always offset to bottom-right,
 // stretched to match bullet shape but rotated to global shadow direction
 function drawBulletShadow(x, y, width, height, bulletAngle, fadeAlpha, shape = 'ellipse') {
+    // === PERFORMANCE OPTIMIZATION: Check shadow quality level ===
+    const shadowQuality = typeof getShadowQuality === 'function' ? getShadowQuality() : 1.0;
+    if (shadowQuality < 0.2) return; // Skip bullet shadows in low quality mode
+    
     // Handle legacy calls with only size parameter (circular shadow)
     if (typeof height === 'undefined' || typeof bulletAngle === 'undefined') {
         // Legacy mode - width is actually 'size', height is 'fadeAlpha'
         const size = width;
         const alpha = height ?? 1;
         CTX.save();
-        CTX.filter = 'blur(2px)'; // Soft shadow blur for bullets
-        CTX.fillStyle = `rgba(0, 0, 0, ${BULLET_SHADOW_ALPHA * alpha})`;
+        // OPTIMIZED: Only use blur filter at high quality
+        if (shadowQuality >= 0.7) {
+            CTX.filter = 'blur(2px)'; // Soft shadow blur for bullets
+        }
+        CTX.fillStyle = `rgba(0, 0, 0, ${BULLET_SHADOW_ALPHA * alpha * shadowQuality})`;
         CTX.beginPath();
         CTX.arc(x + BULLET_SHADOW_OFFSET_X, y + BULLET_SHADOW_OFFSET_Y, size, 0, Math.PI * 2);
         CTX.fill();
-        CTX.filter = 'none';
+        if (shadowQuality >= 0.7) {
+            CTX.filter = 'none';
+        }
         CTX.restore();
         return;
     }
@@ -5043,6 +5085,9 @@ function draw() {
     const viewRight = viewLeft + CANVAS.width + tileSize * 2;
     const viewBottom = viewTop + CANVAS.height + tileSize * 2;
     
+    // Get terrain detail level from Smart Performance Optimizer
+    const terrainDetail = typeof getTerrainDetail === 'function' ? getTerrainDetail() : 1.0;
+    
     CTX.save();
     if (screenShake > 0) CTX.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
     CTX.translate(-camX, -camY);
@@ -5080,23 +5125,29 @@ function draw() {
             CTX.fillStyle = baseColor;
             CTX.fillRect(tx, ty, tileSize, tileSize);
             
+            // === TERRAIN DETAIL (Controlled by Smart Performance Optimizer) ===
+            // Skip detailed terrain rendering when performance is low
+            if (terrainDetail < 0.3) continue; // Emergency mode: skip all details
+            
             // Add terrain texture details
             const detailSeed = Math.abs(seed * 1000) % 10;
             
-            // Grass blades for grass areas - brighter highlights
-            if (terrainValue < 0.2 && terrainValue > -0.3) {
+            // Grass blades for grass areas - brighter highlights (skip if detail < 0.7)
+            if (terrainDetail >= 0.7 && terrainValue < 0.2 && terrainValue > -0.3) {
                 CTX.fillStyle = 'rgba(100, 140, 60, 0.5)';
-                for (let i = 0; i < 5; i++) {
+                const grassCount = Math.ceil(5 * terrainDetail);
+                for (let i = 0; i < grassCount; i++) {
                     const gx = tx + ((seed * (i + 1) * 100) % tileSize);
                     const gy = ty + ((seed2 * (i + 2) * 100) % tileSize);
                     CTX.fillRect(gx, gy, 2, 4 + Math.abs(seed * 4));
                 }
             }
             
-            // Pebbles/rocks for dirt areas - lighter stones
-            if (terrainValue > 0.2) {
+            // Pebbles/rocks for dirt areas - lighter stones (skip if detail < 0.5)
+            if (terrainDetail >= 0.5 && terrainValue > 0.2) {
                 CTX.fillStyle = 'rgba(180, 160, 130, 0.4)';
-                for (let i = 0; i < 3; i++) {
+                const pebbleCount = Math.ceil(3 * terrainDetail);
+                for (let i = 0; i < pebbleCount; i++) {
                     const px = tx + ((seed * (i + 3) * 80) % (tileSize - 4));
                     const py = ty + ((seed2 * (i + 1) * 90) % (tileSize - 4));
                     CTX.beginPath();
@@ -5105,8 +5156,8 @@ function draw() {
                 }
             }
             
-            // Tire/track marks (subtle battle scars)
-            if (detailSeed > 7) {
+            // Tire/track marks (subtle battle scars) - skip if detail < 0.8
+            if (terrainDetail >= 0.8 && detailSeed > 7) {
                 CTX.strokeStyle = 'rgba(80, 70, 55, 0.2)';
                 CTX.lineWidth = 3;
                 CTX.beginPath();
@@ -5115,12 +5166,14 @@ function draw() {
                 CTX.stroke();
             }
             
-            // Subtle shadow for depth (lighter)
-            CTX.fillStyle = `rgba(0, 0, 0, ${Math.abs(seed) * 0.04})`;
-            CTX.fillRect(tx, ty, tileSize, tileSize);
+            // Subtle shadow for depth (lighter) - skip if detail < 0.6
+            if (terrainDetail >= 0.6) {
+                CTX.fillStyle = `rgba(0, 0, 0, ${Math.abs(seed) * 0.04})`;
+                CTX.fillRect(tx, ty, tileSize, tileSize);
+            }
             
-            // Brighter highlights for sunlit effect
-            if (seed2 > 0.3) {
+            // Brighter highlights for sunlit effect - skip if detail < 0.9
+            if (terrainDetail >= 0.9 && seed2 > 0.3) {
                 CTX.fillStyle = `rgba(255, 255, 200, ${seed2 * 0.08})`;
                 CTX.fillRect(tx, ty, tileSize / 2, tileSize / 2);
             }
@@ -5132,6 +5185,12 @@ function draw() {
 
     // Draw tank tracks (dirty trails) BEFORE walls/objects for realism
     // Only enemy tracks shown for better tracking of enemy movements
+    // Get track quality from Smart Performance Optimizer
+    const trackQuality = typeof getTrackQuality === 'function' ? getTrackQuality() : 1.0;
+    
+    // Skip track rendering entirely if quality is 0 (emergency mode)
+    if (trackQuality > 0) {
+    
     const trackViewLeft = camX - 100;
     const trackViewRight = camX + CANVAS.width + 100;
     const trackViewTop = camY - 100;
@@ -5206,32 +5265,6 @@ function draw() {
             const dy = track.y - track.prevY;
             const dist = Math.hypot(dx, dy);
             
-            // Use tank facing direction for control points (more natural tank movement)
-            // Tank tracks follow the direction the tank is facing, not movement direction
-            const currDirX = Math.cos(track.angle);
-            const currDirY = Math.sin(track.angle);
-            const prevDirX = Math.cos(prevAngle);
-            const prevDirY = Math.sin(prevAngle);
-            
-            // Adaptive tension based on angle change - stronger curves on sharp turns
-            const angleDiff = Math.abs(track.angle - prevAngle);
-            const normalizedAngle = Math.min(angleDiff, Math.PI * 2 - angleDiff);
-            const turnFactor = 1 + normalizedAngle * 3; // Much stronger curves on sharp turns
-            const curveTension = dist * 0.5 * turnFactor; // Increased base tension
-            
-            // Control points follow tank facing direction for natural track curves
-            // First control point extends from prev position in tank's prev facing direction
-            const leftCtrl1X = leftPrevX + prevDirX * curveTension;
-            const leftCtrl1Y = leftPrevY + prevDirY * curveTension;
-            // Second control point extends back from current position in reverse of current facing
-            const leftCtrl2X = leftCurrX - currDirX * curveTension;
-            const leftCtrl2Y = leftCurrY - currDirY * curveTension;
-            
-            const rightCtrl1X = rightPrevX + prevDirX * curveTension;
-            const rightCtrl1Y = rightPrevY + prevDirY * curveTension;
-            const rightCtrl2X = rightCurrX - currDirX * curveTension;
-            const rightCtrl2Y = rightCurrY - currDirY * curveTension;
-            
             CTX.lineCap = 'round';
             CTX.lineJoin = 'round';
             
@@ -5240,32 +5273,77 @@ function draw() {
             CTX.strokeStyle = `rgb(${dirtR}, ${dirtG}, ${dirtB})`;
             CTX.lineWidth = treadWidth;
             
-            // LEFT track with Bezier curve for smooth turns
-            CTX.beginPath();
-            CTX.moveTo(leftPrevX, leftPrevY);
-            CTX.bezierCurveTo(leftCtrl1X, leftCtrl1Y, leftCtrl2X, leftCtrl2Y, leftCurrX, leftCurrY);
-            CTX.stroke();
-            
-            // RIGHT track with Bezier curve
-            CTX.beginPath();
-            CTX.moveTo(rightPrevX, rightPrevY);
-            CTX.bezierCurveTo(rightCtrl1X, rightCtrl1Y, rightCtrl2X, rightCtrl2Y, rightCurrX, rightCurrY);
-            CTX.stroke();
-            
-            // Subtle inner line for depth (very light) - only on fresh tracks
-            if (combinedFreshness > 0.6) {
-                CTX.globalAlpha = trackAlpha * 0.5;
-                CTX.strokeStyle = `rgb(${dirtR - 15}, ${dirtG - 12}, ${dirtB - 10})`;
-                CTX.lineWidth = treadWidth * 0.35;
+            // === TRACK RENDERING QUALITY OPTIMIZATION ===
+            // Use bezier curves only when quality >= 0.5, otherwise use simple lines
+            if (trackQuality >= 0.5) {
+                // Use tank facing direction for control points (more natural tank movement)
+                // Tank tracks follow the direction the tank is facing, not movement direction
+                const currDirX = Math.cos(track.angle);
+                const currDirY = Math.sin(track.angle);
+                const prevDirX = Math.cos(prevAngle);
+                const prevDirY = Math.sin(prevAngle);
                 
+                // Adaptive tension based on angle change - stronger curves on sharp turns
+                const angleDiff = Math.abs(track.angle - prevAngle);
+                const normalizedAngle = Math.min(angleDiff, Math.PI * 2 - angleDiff);
+                const turnFactor = 1 + normalizedAngle * 3; // Much stronger curves on sharp turns
+                const curveTension = dist * 0.5 * turnFactor; // Increased base tension
+                
+                // Control points follow tank facing direction for natural track curves
+                // First control point extends from prev position in tank's prev facing direction
+                const leftCtrl1X = leftPrevX + prevDirX * curveTension;
+                const leftCtrl1Y = leftPrevY + prevDirY * curveTension;
+                // Second control point extends back from current position in reverse of current facing
+                const leftCtrl2X = leftCurrX - currDirX * curveTension;
+                const leftCtrl2Y = leftCurrY - currDirY * curveTension;
+                
+                const rightCtrl1X = rightPrevX + prevDirX * curveTension;
+                const rightCtrl1Y = rightPrevY + prevDirY * curveTension;
+                const rightCtrl2X = rightCurrX - currDirX * curveTension;
+                const rightCtrl2Y = rightCurrY - currDirY * curveTension;
+            
+                // LEFT track with Bezier curve for smooth turns
                 CTX.beginPath();
                 CTX.moveTo(leftPrevX, leftPrevY);
                 CTX.bezierCurveTo(leftCtrl1X, leftCtrl1Y, leftCtrl2X, leftCtrl2Y, leftCurrX, leftCurrY);
                 CTX.stroke();
                 
+                // RIGHT track with Bezier curve
                 CTX.beginPath();
                 CTX.moveTo(rightPrevX, rightPrevY);
                 CTX.bezierCurveTo(rightCtrl1X, rightCtrl1Y, rightCtrl2X, rightCtrl2Y, rightCurrX, rightCurrY);
+                CTX.stroke();
+                
+                // Subtle inner line for depth (very light) - only on fresh tracks and high quality
+                if (trackQuality >= 0.6 && combinedFreshness > 0.6) {
+                    CTX.globalAlpha = trackAlpha * 0.5;
+                    CTX.strokeStyle = `rgb(${dirtR - 15}, ${dirtG - 12}, ${dirtB - 10})`;
+                    CTX.lineWidth = treadWidth * 0.35;
+                    
+                    CTX.beginPath();
+                    CTX.moveTo(leftPrevX, leftPrevY);
+                    CTX.bezierCurveTo(leftCtrl1X, leftCtrl1Y, leftCtrl2X, leftCtrl2Y, leftCurrX, leftCurrY);
+                    CTX.stroke();
+                    
+                    CTX.beginPath();
+                    CTX.moveTo(rightPrevX, rightPrevY);
+                    CTX.bezierCurveTo(rightCtrl1X, rightCtrl1Y, rightCtrl2X, rightCtrl2Y, rightCurrX, rightCurrY);
+                    CTX.stroke();
+                }
+            } else {
+                // LOW QUALITY MODE: Use simple straight lines instead of bezier curves
+                // Much faster rendering at the cost of less smooth track appearance
+                
+                // LEFT track - simple line
+                CTX.beginPath();
+                CTX.moveTo(leftPrevX, leftPrevY);
+                CTX.lineTo(leftCurrX, leftCurrY);
+                CTX.stroke();
+                
+                // RIGHT track - simple line
+                CTX.beginPath();
+                CTX.moveTo(rightPrevX, rightPrevY);
+                CTX.lineTo(rightCurrX, rightCurrY);
                 CTX.stroke();
             }
         }
@@ -5273,6 +5351,11 @@ function draw() {
     
     CTX.globalAlpha = 1;
     CTX.restore();
+    
+    } // End of track rendering block (trackQuality > 0)
+    
+    // Get shadow quality from Smart Performance Optimizer
+    const shadowQuality = typeof getShadowQuality === 'function' ? getShadowQuality() : 1.0;
 
     for (let w of walls) {
         if (w.x < camX + CANVAS.width && w.x + w.w > camX && w.y < camY + CANVAS.height && w.y + w.h > camY) {
@@ -5281,12 +5364,21 @@ function draw() {
             const shakeY = w.shakeY || 0;
             
             // Dramatic wall shadow with blur for soft edges
-            CTX.save();
-            CTX.filter = 'blur(3px)';
-            CTX.fillStyle = 'rgba(0, 0, 0, 0.35)';
-            CTX.fillRect(w.x + 6 + shakeX, w.y + 6 + shakeY, w.w, w.h);
-            CTX.filter = 'none';
-            CTX.restore();
+            // OPTIMIZED: Use blur only when shadowQuality > 0
+            if (shadowQuality > 0) {
+                CTX.save();
+                // Reduce blur radius based on quality (3px at full, 1px at low)
+                const blurRadius = Math.max(1, Math.round(3 * shadowQuality));
+                CTX.filter = `blur(${blurRadius}px)`;
+                CTX.fillStyle = `rgba(0, 0, 0, ${0.35 * shadowQuality})`;
+                CTX.fillRect(w.x + 6 + shakeX, w.y + 6 + shakeY, w.w, w.h);
+                CTX.filter = 'none';
+                CTX.restore();
+            } else {
+                // No blur - simple shadow for emergency mode
+                CTX.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                CTX.fillRect(w.x + 4 + shakeX, w.y + 4 + shakeY, w.w, w.h);
+            }
             
             // Determine wall type based on size: thin walls = sandbags/barriers, thick = shipping containers
             const isThick = w.w > 70 || w.h > 70;
@@ -10940,11 +11032,37 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
     }
 
     // Draw bullets with unique weapon-specific styles
-    // OPTIMIZATION: Use viewport culling to skip off-screen bullets
+    // === COMPREHENSIVE BULLET RENDERING OPTIMIZATION ===
+    // This is often a major performance bottleneck when many bullets are on screen
     const bulletMargin = 50; // Extra margin for bullet trails
+    const bulletEffectDetail = typeof getEffectDetail === 'function' ? getEffectDetail() : 1.0;
+    const bulletCount = bullets.length;
+    
+    // Calculate max bullets to render based on performance level
+    // At full quality: render all, at low quality: render fewer with simpler effects
+    const maxBulletsToRender = bulletEffectDetail >= 0.8 ? bulletCount 
+                              : bulletEffectDetail >= 0.5 ? Math.min(bulletCount, 80)
+                              : Math.min(bulletCount, 40);
+    
+    let bulletsRendered = 0;
+    
     for (let b of bullets) {
-        // Skip bullets outside viewport
+        // Skip bullets outside viewport first (cheapest check)
         if (typeof isInViewport === 'function' && !isInViewport(b.x, b.y, bulletMargin)) continue;
+        
+        // Performance cap: skip bullets if we've rendered enough
+        bulletsRendered++;
+        if (bulletsRendered > maxBulletsToRender) {
+            // In low quality mode, at least draw a simple dot for remaining bullets
+            if (bulletEffectDetail < 0.5) {
+                CTX.fillStyle = b.color || '#ffffff';
+                CTX.globalAlpha = 0.7;
+                CTX.beginPath();
+                CTX.arc(b.x, b.y, 3, 0, Math.PI * 2);
+                CTX.fill();
+            }
+            continue;
+        }
         
         CTX.save();
         const fadeAlpha = b.life < 15 ? b.life / 15 : 1;
@@ -10980,10 +11098,13 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
             'pierce': 5, 'ice': 7, 'fire': 9, 'electric': 8
         };
         
-        // Draw motion blur effect for all bullets
-        const blurColor = blurColors[b.type] || b.color || '#ffffff';
-        const blurLength = Math.min(speed * 5, 70); // Increased length for more visible trails
-        drawBulletMotionBlur(b, blurColor, fadeAlpha, blurLength, 0.65); // Increased intensity
+        // Draw motion blur effect for all bullets (only at medium+ quality)
+        // Motion blur is expensive - skip at low quality
+        if (bulletEffectDetail >= 0.4) {
+            const blurColor = blurColors[b.type] || b.color || '#ffffff';
+            const blurLength = Math.min(speed * 5, 70) * bulletEffectDetail; // Scale blur length with quality
+            drawBulletMotionBlur(b, blurColor, fadeAlpha, blurLength, 0.65 * bulletEffectDetail);
+        }
         
         // Draw based on weapon/bullet type
         switch(b.type) {

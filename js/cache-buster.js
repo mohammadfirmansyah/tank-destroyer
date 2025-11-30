@@ -6,7 +6,7 @@
 (function() {
     'use strict';
     
-    const CACHE_BUSTER_VERSION = 'v2.0.0-RC.4';
+    const CACHE_BUSTER_VERSION = 'v2.0.0-RC.5';
     const CACHE_BUSTER_KEY = 'tank_destroyer_cache_cleared';
     
     /**
