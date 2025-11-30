@@ -55,7 +55,7 @@ function preWarmCanvas() {
         // Ignore errors (CORS issues on some browsers)
     }
     
-    console.log('[PreWarm] Canvas GPU initialized');
+    console.log('[PreWarm] Main canvas GPU initialized (page load)');
 }
 
 // Update continue button state based on save availability

@@ -271,6 +271,41 @@ let smoothPerfValues = {
 const PERF_LERP_SPEED = 0.08; // How fast values transition when DECREASING quality
 const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING quality (instant feel)
 
+// Reset Smart Performance to full quality - call when starting new game
+// This ensures game always starts at highest graphics, not leftover degraded state
+function resetSmartPerformance() {
+    smartPerfLevel = 0;
+    smartPerfRecoveryFrames = 0;
+    smartPerfFPSHistory = [];
+    smartPerfBottleneck = 'none';
+    
+    // CRITICAL: Reset smooth values to FULL QUALITY immediately (no lerp)
+    // This prevents starting game with degraded graphics from previous session/demo
+    const fullQuality = SMART_PERF_LEVELS[0];
+    smoothPerfValues.particleMultiplier = fullQuality.particleMultiplier;
+    smoothPerfValues.maxParticles = fullQuality.maxParticles;
+    smoothPerfValues.cullDistance = fullQuality.cullDistance;
+    smoothPerfValues.trailLength = fullQuality.trailLength;
+    smoothPerfValues.effectDetail = fullQuality.effectDetail;
+    smoothPerfValues.shadowQuality = fullQuality.shadowQuality;
+    smoothPerfValues.terrainDetail = fullQuality.terrainDetail;
+    smoothPerfValues.trackQuality = fullQuality.trackQuality;
+    smoothPerfValues.wallDetail = fullQuality.wallDetail;
+    
+    // Reset metrics
+    smartPerfMetrics = {
+        particleCount: 0,
+        enemyCount: 0,
+        bulletCount: 0,
+        trackCount: 0,
+        wallCount: 0,
+        effectCount: 0,
+        sampleCount: 0
+    };
+    
+    console.log('[SmartPerf] Reset to full quality for new game');
+}
+
 // Linear interpolation helper
 function lerpValue(current, target, speed) {
     const diff = target - current;

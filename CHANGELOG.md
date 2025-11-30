@@ -5,6 +5,32 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.11] - 2025-12-01
+
+### Fixed
+- 🏆 **Achievement Popup HUD Transparency** - All HUD elements now properly fade
+  - **Bug**: Only HUD elements directly overlapped by popup became transparent
+  - **Fix**: Use CSS `!important` to override any inline styles or JS-set opacity
+  - **Added selectors**: `.hud-top *`, `.controls-area *`, `#pause-btn`, `#minimap`
+  - **Result**: ALL top-screen HUD elements fade to 25% opacity when achievement shows
+
+- 🎮 **Game Start Full Quality Graphics** - Fix degraded graphics on deploy
+  - **Bug**: Game started with lowest graphics setting, then slowly improved
+  - **Root Cause**: `smoothPerfValues` retained degraded state from demo/previous session
+  - **New `resetSmartPerformance()` Function** - Resets ALL performance values instantly
+    - Resets `smartPerfLevel` to 0 (full quality)
+    - Clears FPS history and bottleneck detection
+    - Sets all `smoothPerfValues` to full quality immediately (no lerp delay)
+  - **Called in `startGame()`** before canvas initialization
+  - **Result**: Game always starts at maximum graphics quality
+
+- 📝 **Improved PreWarm Console Logs** - Differentiate canvas initialization sources
+  - `[PreWarm] Main canvas GPU initialized (page load)` - main.js on page load
+  - `[PreWarm] Demo canvas GPU initialized (startDemo)` - demo.js for homepage battle
+  - `[PreWarm] Game canvas GPU initialized (startGame)` - gameplay.js for actual game
+
+---
+
 ## [2.0.0-RC.10] - 2025-12-01
 
 ### Fixed

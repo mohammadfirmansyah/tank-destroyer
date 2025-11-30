@@ -5553,9 +5553,12 @@ body.achievements-open #turbo-btn {
 	transition: opacity 0.25s ease;
 }
 
-/* Make HUD transparent when achievement popup notification is showing */
+/* Make ALL HUD elements transparent when achievement popup notification is showing */
+/* Uses !important to override any inline styles or JS-set opacity values */
 body.achievement-popup-showing .hud-top,
+body.achievement-popup-showing .hud-top *,
 body.achievement-popup-showing .controls-area,
+body.achievement-popup-showing .controls-area *,
 body.achievement-popup-showing .keyboard-hint,
 body.achievement-popup-showing .ability-btn,
 body.achievement-popup-showing #ult-btn,
@@ -5564,10 +5567,12 @@ body.achievement-popup-showing #lifesteal-timer,
 body.achievement-popup-showing #magnet-timer,
 body.achievement-popup-showing #wave-indicator,
 body.achievement-popup-showing #wave-timer,
+body.achievement-popup-showing #pause-btn,
 body.achievement-popup-showing .fps-hud,
-body.achievement-popup-showing .minimap-container {
-	opacity: 0.25;
-	transition: opacity 0.3s ease;
+body.achievement-popup-showing .minimap-container,
+body.achievement-popup-showing #minimap {
+	opacity: 0.25 !important;
+	transition: opacity 0.3s ease !important;
 }
 
 /* CRITICAL: Force hide boss-warning during achievement popup with highest priority */

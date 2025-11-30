@@ -107,6 +107,12 @@ function startGame() {
     // Stop demo battle background
     if (typeof stopDemo === 'function') stopDemo();
     
+    // === RESET SMART PERFORMANCE TO FULL QUALITY ===
+    // Ensures game always starts with highest graphics, not leftover from demo/previous session
+    if (typeof resetSmartPerformance === 'function') {
+        resetSmartPerformance();
+    }
+    
     // === MOBILE GPU-SAFE CANVAS INITIALIZATION ===
     // Step 1: Get canvas reference and hide it during initialization
     const gameCanvas = document.getElementById('gameCanvas');
@@ -139,6 +145,7 @@ function startGame() {
     
     // Step 6: Force synchronous GPU flush (ensures GPU processed all commands)
     try { CTX.getImageData(0, 0, 1, 1); } catch(e) {}
+    console.log('[PreWarm] Game canvas GPU initialized (startGame)');
     
     // Step 7: Reset frame timing state for smooth start
     lastFrameTime = -1;

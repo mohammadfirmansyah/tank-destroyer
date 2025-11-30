@@ -73,6 +73,7 @@ function startDemo() {
     
     // Step 4: Force synchronous GPU flush (ensures GPU processed all commands)
     try { CTX.getImageData(0, 0, 1, 1); } catch(e) {}
+    console.log('[PreWarm] Demo canvas GPU initialized (startDemo)');
     
     // FRUSTUM CULLING: Initialize viewport bounds immediately for particle system
     // This ensures visible particle counting works from the first frame
