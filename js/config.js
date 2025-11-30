@@ -7,28 +7,25 @@ const RIVER_WIDTH = 80; // Width of river border around the battlefield
 const RIVER_BOUNDARY = RIVER_WIDTH + 35; // Collision boundary for river (accounts for tank visual width ~30px)
 const CANVAS = document.getElementById('gameCanvas');
 
-// === GPU-OPTIMIZED CANVAS CONTEXT SETTINGS ===
-// These settings maximize GPU utilization for Canvas 2D rendering:
-// - alpha: false - Disables alpha channel, GPU skips transparency blending
-// - desynchronized: true - Allows async rendering, reduces input latency
+// === MOBILE-COMPATIBLE CANVAS CONTEXT SETTINGS ===
+// These settings prioritize stability across all devices including mobile GPUs:
+// - alpha: false - Disables alpha channel for opaque canvas (performance boost)
 // - willReadFrequently: false - Optimizes for write-only operations
+// NOTE: desynchronized removed - causes visual glitches on mobile GPUs
+//       (Samsung, Qualcomm Adreno, Mali, PowerVR have issues with async rendering)
 const CTX = CANVAS.getContext('2d', { 
     alpha: false,
-    desynchronized: true,
     willReadFrequently: false
 });
 
-// Apply additional GPU optimizations to canvas context
-// Disable image smoothing for faster pixel operations
+// Apply GPU-friendly settings that work on all devices
 CTX.imageSmoothingEnabled = false;
-CTX.imageSmoothingQuality = 'low';
 
-// Minimap canvas with GPU optimization
+// Minimap canvas with mobile-safe settings
 const MINI_CANVAS = document.getElementById('minimap');
 const MINI_CTX = MINI_CANVAS.getContext('2d', { 
     alpha: true, 
-    willReadFrequently: false,
-    desynchronized: true 
+    willReadFrequently: false
 });
 MINI_CTX.imageSmoothingEnabled = false;
 const ENEMY_WALL_PADDING = 8; // Reduced to allow tanks to pass through narrow passages

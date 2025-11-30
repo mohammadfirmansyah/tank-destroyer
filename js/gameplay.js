@@ -107,31 +107,31 @@ function startGame() {
     // Stop demo battle background
     if (typeof stopDemo === 'function') stopDemo();
     
-    // CRITICAL: Remove active class first to reset opacity state
+    // === MOBILE GPU-SAFE CANVAS INITIALIZATION ===
+    // Step 1: Get canvas reference and hide it during initialization
     const gameCanvas = document.getElementById('gameCanvas');
     gameCanvas.classList.remove('active');
+    gameCanvas.style.visibility = 'hidden'; // Hide completely during init
     
-    // CRITICAL: Fill canvas with black first to prevent any glitch artifacts
-    CTX.fillStyle = '#1a1a1a'; // Match terrain background color
-    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
-    
-    // CRITICAL: Force canvas resize before showing game to prevent mobile glitch
-    // This ensures canvas dimensions are correct before any rendering
+    // Step 2: Force canvas resize BEFORE any drawing
     if (typeof resize === 'function') {
-        // Reset last dimensions to force resize
         if (typeof lastWidth !== 'undefined') lastWidth = 0;
         if (typeof lastHeight !== 'undefined') lastHeight = 0;
         resize();
     }
     
-    // CRITICAL: Reset frame timing state to ensure smooth start
-    // This prevents skipped frames or timing issues on game start
+    // Step 3: Reset canvas context state (prevents GPU state corruption)
+    CTX.setTransform(1, 0, 0, 1, 0, 0); // Reset transform matrix
+    CTX.globalAlpha = 1.0;
+    CTX.globalCompositeOperation = 'source-over';
+    
+    // Step 4: Clear canvas with terrain base color (matches what draw() will render)
+    CTX.fillStyle = '#8B9A6B'; // Terrain base color
+    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+    
+    // Step 5: Reset frame timing state for smooth start
     lastFrameTime = -1;
     frameTimeAccumulator = 0;
-    
-    // Fill canvas with terrain color again after resize
-    CTX.fillStyle = '#1a1a1a';
-    CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
     // Show UI layer when game starts
     document.getElementById('ui-layer').classList.add('active');
@@ -229,13 +229,18 @@ function startGame() {
 
     if (animationId) cancelAnimationFrame(animationId);
     
-    // CRITICAL: Draw first frame BEFORE showing canvas to prevent glitch
-    // This ensures canvas has valid content before fade-in
+    // === MOBILE GPU-SAFE CANVAS REVEAL ===
+    // Step 1: Draw first complete frame while canvas is hidden
     draw();
     
-    // Now show canvas with fade-in after first frame is rendered
+    // Step 2: Use double rAF to ensure GPU has fully processed the frame
+    // This prevents showing unfinished/corrupted frame buffer on mobile
     requestAnimationFrame(() => {
-        gameCanvas.classList.add('active');
+        requestAnimationFrame(() => {
+            // Step 3: Now safe to show canvas - GPU buffer is ready
+            gameCanvas.style.visibility = 'visible';
+            gameCanvas.classList.add('active');
+        });
     });
     
     loop(performance.now());

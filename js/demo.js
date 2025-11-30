@@ -53,8 +53,14 @@ function startDemo() {
     CANVAS.width = window.innerWidth;
     CANVAS.height = window.innerHeight;
     
-    // CRITICAL: Fill canvas with terrain color to prevent glitch artifacts
-    CTX.fillStyle = '#1a1a1a'; // Match terrain background color
+    // === MOBILE GPU-SAFE DEMO INITIALIZATION ===
+    // Reset canvas context state (prevents GPU state corruption on mobile)
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    CTX.globalAlpha = 1.0;
+    CTX.globalCompositeOperation = 'source-over';
+    
+    // Fill canvas with terrain color to match draw() output
+    CTX.fillStyle = '#8B9A6B'; // Terrain base color
     CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
     
     // FRUSTUM CULLING: Initialize viewport bounds immediately for particle system
@@ -80,8 +86,10 @@ function startDemo() {
     camX = Math.max(demoAreaOffsetX, Math.min(player.x - CANVAS.width / 2, demoAreaOffsetX + DEMO_AREA_SIZE - CANVAS.width));
     camY = Math.max(demoAreaOffsetY, Math.min(player.y - CANVAS.height / 2, demoAreaOffsetY + DEMO_AREA_SIZE - CANVAS.height));
     
-    // Start demo loop
-    demoBattleLoop();
+    // Start demo loop with delay to ensure GPU is ready
+    requestAnimationFrame(() => {
+        demoBattleLoop();
+    });
 }
 
 // Stop demo battle

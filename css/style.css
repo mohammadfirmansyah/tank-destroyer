@@ -10,8 +10,8 @@
 	--font-mono: 'Orbitron', monospace;
 }
 
-/* === GPU HARDWARE ACCELERATION HINTS === */
-/* Force GPU layer creation for smooth rendering */
+/* === MOBILE-COMPATIBLE GPU HINTS === */
+/* Use minimal GPU hints that work across all mobile devices */
 * {
 	/* Disable tap highlight on mobile */
 	-webkit-tap-highlight-color: transparent;
@@ -34,24 +34,21 @@ body {
 	font-weight: 500; /* Medium weight as default - not too thin */
 	user-select: none;
 	-webkit-user-select: none;
-	/* GPU acceleration for body */
-	-webkit-transform: translateZ(0);
-	transform: translateZ(0);
 }
 
-/* GPU-accelerated canvas rendering */
+/* Canvas rendering - mobile-safe GPU hints */
 #gameCanvas,
 #minimap,
 #demo-canvas {
-	/* Force GPU compositing layer */
-	transform: translateZ(0);
-	-webkit-transform: translateZ(0);
-	/* Hint browser to optimize for changes */
-	will-change: contents;
-	/* Disable image smoothing for better performance */
+	/* 
+	 * Mobile GPU Compatibility Notes:
+	 * - Removed will-change:contents (causes glitches on Mali, Adreno GPUs)
+	 * - Removed translateZ(0) on canvas (conflicts with some mobile browsers)
+	 * - Using simpler image-rendering for cross-browser support
+	 */
 	image-rendering: -webkit-optimize-contrast;
 	image-rendering: crisp-edges;
-	/* Backface visibility for GPU layer */
+	/* Backface hidden helps prevent flickering during transitions */
 	-webkit-backface-visibility: hidden;
 	backface-visibility: hidden;
 }

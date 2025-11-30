@@ -5,6 +5,33 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.9] - 2025-12-01
+
+### Fixed
+- 📱 **Mobile GPU Compatibility Fix** - Prevent canvas glitch on mobile devices
+  - **Removed `desynchronized: true`** from canvas context - causes visual glitches on:
+    - Samsung Exynos GPU
+    - Qualcomm Adreno GPU
+    - ARM Mali GPU
+    - PowerVR GPU
+  - **Removed `will-change: contents`** from CSS - overloads mobile GPU memory
+  - **Removed `transform: translateZ(0)`** from canvas - conflicts with some mobile browsers
+  - Canvas now uses stable, universally-supported GPU hints only
+- 🔧 **Canvas Context State Reset** - Prevent GPU state corruption
+  - Reset transform matrix with `CTX.setTransform(1, 0, 0, 1, 0, 0)` before init
+  - Reset `globalAlpha` and `globalCompositeOperation` to defaults
+  - Fill canvas with terrain base color (`#8B9A6B`) to match draw() output
+- 📺 **Improved Canvas Visibility Control** - Hidden during initialization
+  - Canvas uses `visibility: hidden` during init (not just opacity)
+  - Double `requestAnimationFrame` ensures GPU buffer is ready before reveal
+  - First frame rendered completely before canvas becomes visible
+- 🎮 **Demo Screen GPU-Safe Initialization** - Same fixes applied to demo.js
+  - Reset canvas context state before demo starts
+  - Use terrain color for initial fill
+  - Delay demo loop start with `requestAnimationFrame`
+
+---
+
 ## [2.0.0-RC.8] - 2025-12-01
 
 ### Fixed
