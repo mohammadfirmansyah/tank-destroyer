@@ -53,6 +53,9 @@ function startDemo() {
     CANVAS.width = window.innerWidth;
     CANVAS.height = window.innerHeight;
     
+    // CRITICAL: Clear canvas before starting demo to prevent glitch artifacts
+    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    
     // FRUSTUM CULLING: Initialize viewport bounds immediately for particle system
     // This ensures visible particle counting works from the first frame
     // Works correctly for portrait, landscape, and desktop screen orientations
@@ -76,8 +79,10 @@ function startDemo() {
     camX = Math.max(demoAreaOffsetX, Math.min(player.x - CANVAS.width / 2, demoAreaOffsetX + DEMO_AREA_SIZE - CANVAS.width));
     camY = Math.max(demoAreaOffsetY, Math.min(player.y - CANVAS.height / 2, demoAreaOffsetY + DEMO_AREA_SIZE - CANVAS.height));
     
-    // Start demo loop
-    demoBattleLoop();
+    // Start demo loop with slight delay for clean transition
+    requestAnimationFrame(() => {
+        demoBattleLoop();
+    });
 }
 
 // Stop demo battle

@@ -259,6 +259,45 @@ let smartPerfTargetFPS = 58; // Target FPS threshold (slightly below 60 for head
 let smartPerfRecoveryFrames = 0; // Frames of good performance before recovering quality
 let smartPerfBottleneck = 'none'; // Current detected bottleneck type
 
+// Smooth transition values - lerp towards target for glitch-free quality changes
+let smoothPerfValues = {
+    particleMultiplier: 1.0,
+    maxParticles: 500,
+    cullDistance: 1500,
+    trailLength: 1.0,
+    effectDetail: 1.0,
+    shadowQuality: 1.0,
+    terrainDetail: 1.0,
+    trackQuality: 1.0,
+    wallDetail: 1.0
+};
+const PERF_LERP_SPEED = 0.08; // How fast values transition (0.08 = smooth, 0.2 = faster)
+
+// Linear interpolation helper
+function lerpValue(current, target, speed) {
+    const diff = target - current;
+    if (Math.abs(diff) < 0.001) return target; // Snap if very close
+    return current + diff * speed;
+}
+
+// Update smooth performance values - call every frame
+function updateSmoothPerfValues() {
+    if (!DEBUG_SMART_PERFORMANCE) return;
+    
+    const target = getSmartPerfSettings();
+    const speed = PERF_LERP_SPEED;
+    
+    smoothPerfValues.particleMultiplier = lerpValue(smoothPerfValues.particleMultiplier, target.particleMultiplier, speed);
+    smoothPerfValues.maxParticles = Math.round(lerpValue(smoothPerfValues.maxParticles, target.maxParticles, speed));
+    smoothPerfValues.cullDistance = lerpValue(smoothPerfValues.cullDistance, target.cullDistance, speed);
+    smoothPerfValues.trailLength = lerpValue(smoothPerfValues.trailLength, target.trailLength, speed);
+    smoothPerfValues.effectDetail = lerpValue(smoothPerfValues.effectDetail, target.effectDetail, speed);
+    smoothPerfValues.shadowQuality = lerpValue(smoothPerfValues.shadowQuality, target.shadowQuality, speed);
+    smoothPerfValues.terrainDetail = lerpValue(smoothPerfValues.terrainDetail, target.terrainDetail, speed);
+    smoothPerfValues.trackQuality = lerpValue(smoothPerfValues.trackQuality, target.trackQuality, speed);
+    smoothPerfValues.wallDetail = lerpValue(smoothPerfValues.wallDetail, target.wallDetail, speed);
+}
+
 // Bottleneck detection counters (accumulated over check interval)
 let smartPerfMetrics = {
     particleCount: 0,
@@ -517,65 +556,66 @@ function updateSmartPerformance(currentFPS) {
 
 // === PERFORMANCE GETTER FUNCTIONS ===
 // Used by rendering code to get current optimization settings
+// Now returns smoothly interpolated values for glitch-free transitions
 
 // Get particle count multiplier based on current optimization level
 function getParticleMultiplier() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().particleMultiplier;
+    return smoothPerfValues.particleMultiplier;
 }
 
 // Get max particles limit based on current optimization level
 function getMaxParticles() {
     if (!DEBUG_SMART_PERFORMANCE) return 500;
-    return getSmartPerfSettings().maxParticles;
+    return smoothPerfValues.maxParticles;
 }
 
 // Get cull distance based on current optimization level
 function getCullDistance() {
     if (!DEBUG_SMART_PERFORMANCE) return 1500;
-    return getSmartPerfSettings().cullDistance;
+    return smoothPerfValues.cullDistance;
 }
 
 // Get shadow quality (0 = no blur, 1 = full blur)
 function getShadowQuality() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().shadowQuality;
+    return smoothPerfValues.shadowQuality;
 }
 
 // Get terrain detail level (0 = solid colors, 1 = full detail)
 function getTerrainDetail() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().terrainDetail;
+    return smoothPerfValues.terrainDetail;
 }
 
 // Get track rendering quality (0 = no tracks, 1 = full bezier curves)
 function getTrackQuality() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().trackQuality;
+    return smoothPerfValues.trackQuality;
 }
 
 // Get wall detail level
 function getWallDetail() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().wallDetail;
+    return smoothPerfValues.wallDetail;
 }
 
 // Get AI update rate (1 = every frame, 2 = every 2 frames, etc)
 function getAIUpdateRate() {
     if (!DEBUG_SMART_PERFORMANCE) return 1;
-    return getSmartPerfSettings().aiUpdateRate;
+    return getSmartPerfSettings().aiUpdateRate; // AI rate doesn't need smoothing
 }
 
 // Get effect detail level (magic circles, auras, etc)
 function getEffectDetail() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().effectDetail;
+    return smoothPerfValues.effectDetail;
 }
 
 // Get trail length multiplier
 function getTrailLength() {
     if (!DEBUG_SMART_PERFORMANCE) return 1.0;
-    return getSmartPerfSettings().trailLength;
+    return smoothPerfValues.trailLength;
 }
 
 // Console access for debugging

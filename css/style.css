@@ -5566,8 +5566,10 @@ body.achievement-popup-showing #turbo-btn,
 body.achievement-popup-showing #lifesteal-timer,
 body.achievement-popup-showing #magnet-timer,
 body.achievement-popup-showing #wave-indicator,
-body.achievement-popup-showing #wave-timer {
-	opacity: 0.3;
+body.achievement-popup-showing #wave-timer,
+body.achievement-popup-showing .fps-hud,
+body.achievement-popup-showing .minimap-container {
+	opacity: 0.25;
 	transition: opacity 0.3s ease;
 }
 
@@ -5659,31 +5661,29 @@ body.demo-active #ui-layer {
 
 .fps-hud {
 	position: fixed;
-	bottom: 15px;
+	bottom: 12px;
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 9999;
 	
-	/* Glassmorphism background with blur */
-	background: rgba(30, 25, 20, 0.6);
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
+	/* Minimal glassmorphism background */
+	background: rgba(30, 25, 20, 0.65);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
 	
-	/* Compact styling - shorter and neater */
-	padding: 4px 10px;
-	border-radius: 4px;
-	border: 2px solid rgba(139, 115, 85, 0.6);
-	box-shadow: 
-		0 2px 6px rgba(0, 0, 0, 0.4),
-		inset 0 0 8px rgba(0, 0, 0, 0.2);
+	/* Ultra-compact styling */
+	padding: 2px 8px;
+	border-radius: 3px;
+	border: 1px solid rgba(139, 115, 85, 0.5);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 	
 	/* Text styling */
 	font-family: 'Rajdhani', 'Consolas', monospace;
-	font-size: 10px;
+	font-size: 9px;
 	font-weight: 600;
-	letter-spacing: 0.3px;
+	letter-spacing: 0.2px;
 	white-space: nowrap;
-	line-height: 1.2;
+	line-height: 1.1;
 	
 	/* Flex layout for evenly spaced content */
 	display: flex;
@@ -5696,37 +5696,37 @@ body.demo-active #ui-layer {
 	user-select: none;
 	
 	/* Smooth transitions */
-	transition: border-color 0.3s ease, box-shadow 0.3s ease;
+	transition: border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
 }
 
 /* FPS value - color coded dynamically via JS */
 .fps-hud .fps-value {
 	color: #a3e635;
-	min-width: 38px;
+	min-width: 32px;
 	text-align: center;
-	text-shadow: 0 0 6px rgba(163, 230, 53, 0.4);
+	text-shadow: 0 0 4px rgba(163, 230, 53, 0.4);
 	transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
 /* Separator styling - subtle and compact */
 .fps-hud .fps-separator {
-	color: rgba(139, 115, 85, 0.4);
-	margin: 0 5px;
+	color: rgba(139, 115, 85, 0.35);
+	margin: 0 4px;
 	font-weight: 400;
-	font-size: 9px;
+	font-size: 8px;
 }
 
 /* Average FPS - muted tan */
 .fps-hud .fps-avg {
-	color: rgba(212, 197, 176, 0.85);
-	min-width: 36px;
+	color: rgba(212, 197, 176, 0.8);
+	min-width: 30px;
 	text-align: center;
 }
 
 /* Frame time in ms - subtle */
 .fps-hud .fps-ms {
-	color: rgba(168, 153, 138, 0.8);
-	min-width: 38px;
+	color: rgba(168, 153, 138, 0.75);
+	min-width: 32px;
 	text-align: center;
 }
 

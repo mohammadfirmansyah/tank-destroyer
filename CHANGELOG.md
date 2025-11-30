@@ -5,6 +5,32 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.7] - 2025-11-30
+
+### Fixed
+- 📺 **Canvas Glitch Prevention** - Prevent visual glitch when opening game/demo
+  - Clear canvas with `CTX.clearRect()` before showing game screen
+  - Clear canvas again after resize to ensure no artifacts
+  - Add `requestAnimationFrame` delay before showing canvas for clean transition
+  - Demo now clears canvas before starting battle loop
+- 🎮 **FPS HUD Ultra-Compact Design** - Even shorter and cleaner
+  - Reduced padding from 4px to 2px vertical
+  - Reduced border from 2px to 1px
+  - Reduced font size from 10px to 9px
+  - Smaller min-widths (32px/30px/32px) for tighter layout
+  - Reduced bottom position from 15px to 12px
+- 🏆 **Achievement Popup HUD Transparency** - All HUD elements now fade
+  - Added `.fps-hud` and `.minimap-container` to transparency list
+  - Reduced opacity from 0.3 to 0.25 for better visibility of popup
+- 🔄 **Smooth FPS Optimizer Transitions** - Glitch-free quality changes
+  - Added `smoothPerfValues` object with lerp interpolation
+  - Quality changes now smoothly transition over multiple frames
+  - `PERF_LERP_SPEED = 0.08` for buttery smooth transitions
+  - All getter functions now return smoothly interpolated values
+  - AI update rate exempt from smoothing (discrete value)
+
+---
+
 ## [2.0.0-RC.6] - 2025-11-30
 
 ### Fixed

@@ -107,6 +107,10 @@ function startGame() {
     // Stop demo battle background
     if (typeof stopDemo === 'function') stopDemo();
     
+    // CRITICAL: Clear canvas before showing to prevent glitch artifacts
+    const gameCanvas = document.getElementById('gameCanvas');
+    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    
     // CRITICAL: Force canvas resize before showing game to prevent mobile glitch
     // This ensures canvas dimensions are correct before any rendering
     if (typeof resize === 'function') {
@@ -121,9 +125,13 @@ function startGame() {
     lastFrameTime = -1;
     frameTimeAccumulator = 0;
     
-    // Add canvas fade-in effect
-    const gameCanvas = document.getElementById('gameCanvas');
-    gameCanvas.classList.add('active');
+    // Clear canvas again after resize to ensure no artifacts
+    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    
+    // Add canvas fade-in effect with slight delay for clean transition
+    requestAnimationFrame(() => {
+        gameCanvas.classList.add('active');
+    });
     
     // Show UI layer when game starts
     document.getElementById('ui-layer').classList.add('active');
@@ -557,6 +565,11 @@ function loop(timestamp) {
             // Frame time is good, gradually restore quality
             adaptiveQuality = Math.min(1.0, adaptiveQuality + 0.02);
         }
+    }
+    
+    // Update smooth performance transition values every frame for glitch-free quality changes
+    if (typeof updateSmoothPerfValues === 'function') {
+        updateSmoothPerfValues();
     }
     
     // === FIXED TIMESTEP ACCUMULATOR ===
