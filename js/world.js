@@ -495,3 +495,23 @@ function toHex(value) {
     const hex = value.toString(16);
     return hex.length === 1 ? `0${hex}` : hex;
 }
+
+// =============================================================================
+// COLLISION HELPERS (Must be in world.js to be available for systems.js)
+// =============================================================================
+
+// Collision helpers treat walls as axis-aligned boxes to keep tests cheap.
+// These functions are used by multiple modules (systems.js, gameplay.js)
+function checkWall(x, y, r) {
+    for (let w of walls) {
+        if (x > w.x - r && x < w.x + w.w + r && y > w.y - r && y < w.y + w.h + r) return true;
+    }
+    return false;
+}
+
+function checkCrate(x, y, r) {
+    for (let c of crates) {
+        if (x > c.x - r && x < c.x + c.w + r && y > c.y - r && y < c.y + c.h + r) return true;
+    }
+    return false;
+}

@@ -543,25 +543,44 @@ const DEMO_FIXED_TIMESTEP = 16.67;
 const DEMO_MAX_ACCUMULATED = 100;
 let demoAccumulatedTime = 0;
 
-// === FPS LIMITER FOR DEMO ===
+// === FPS LIMITER FOR DEMO (Robust for high refresh rate monitors) ===
 const DEMO_TARGET_FPS = 60;
 const DEMO_FRAME_MIN_TIME = 1000 / DEMO_TARGET_FPS;
-let demoLastFrameTime = 0;
+let demoLastFrameTime = -1; // Initialize to -1 for first frame detection
+let demoFrameTimeAccumulator = 0; // Accumulates fractional frame time
 
 // Main demo battle loop - uses fixed timestep for consistent speed
 function demoBattleLoop() {
     if (!demoActive) return;
     
+    // Schedule next frame immediately
+    demoAnimationFrame = requestAnimationFrame(demoBattleLoop);
+    
     const now = performance.now();
     
-    // === FPS LIMITER ===
-    // Skip frame if not enough time has passed
-    const timeSinceLastFrame = now - demoLastFrameTime;
-    if (timeSinceLastFrame < DEMO_FRAME_MIN_TIME) {
-        demoAnimationFrame = requestAnimationFrame(demoBattleLoop);
-        return;
+    // === FPS LIMITER (Robust for 120Hz/144Hz/240Hz monitors) ===
+    // Initialize on first frame
+    if (demoLastFrameTime < 0) {
+        demoLastFrameTime = now;
+        demoLastTime = now;
+        return; // Skip first frame to establish baseline
     }
+    
+    // Calculate delta and accumulate
+    const deltaTime = now - demoLastFrameTime;
+    demoFrameTimeAccumulator += deltaTime;
     demoLastFrameTime = now;
+    
+    // Only process if enough time accumulated (16.67ms for 60 FPS)
+    if (demoFrameTimeAccumulator < DEMO_FRAME_MIN_TIME) {
+        return; // Skip, not enough time
+    }
+    
+    // Consume frame time, keep remainder for precision
+    demoFrameTimeAccumulator -= DEMO_FRAME_MIN_TIME;
+    if (demoFrameTimeAccumulator > DEMO_FRAME_MIN_TIME) {
+        demoFrameTimeAccumulator = 0; // Reset if behind
+    }
     
     const elapsed = now - demoLastTime;
     demoLastTime = now;
@@ -585,8 +604,6 @@ function demoBattleLoop() {
     
     // Always render once per frame
     drawDemo();
-    
-    demoAnimationFrame = requestAnimationFrame(demoBattleLoop);
 }
 
 // Update demo simulation

@@ -448,9 +448,11 @@ let adaptiveQuality = 1.0; // 1.0 = full quality, lower = reduced effects
 
 // === FPS LIMITER SYSTEM ===
 // Caps frame rate at 60 FPS for consistent gameplay and power efficiency
-const TARGET_FPS = 60;
-const FRAME_MIN_TIME = 1000 / TARGET_FPS; // Minimum time between frames (16.67ms)
-let lastFrameTime = 0;
+// Uses a robust timing approach that works on high refresh rate monitors (120Hz, 144Hz, etc.)
+// TARGET_FPS and FRAME_TIME are defined in config.js
+const FRAME_MIN_TIME = FRAME_TIME; // Use FRAME_TIME from config.js (16.67ms for 60fps)
+let lastFrameTime = -1; // Initialize to -1 to ensure first frame always runs
+let frameTimeAccumulator = 0; // Accumulates fractional frame time for precision
 
 // === FIXED TIMESTEP SYSTEM ===
 // Accumulates time and runs physics in fixed steps to ensure consistent speed
@@ -465,19 +467,38 @@ let accumulatedTime = 0;
 function loop(timestamp) {
     if ((state !== 'GAME' && state !== 'MISSION_FAIL') || paused) return;
     
-    // === FPS LIMITER ===
-    // Skip frame if not enough time has passed since last frame
-    // This caps the frame rate at TARGET_FPS (60) for consistent gameplay
-    const timeSinceLastFrame = timestamp - lastFrameTime;
-    if (timeSinceLastFrame < FRAME_MIN_TIME) {
-        // Schedule next frame check but don't process this one
-        animationId = requestAnimationFrame(loop);
-        return;
+    // Schedule next frame immediately (let browser handle timing)
+    animationId = requestAnimationFrame(loop);
+    
+    // === FPS LIMITER (Robust for high refresh rate monitors) ===
+    // Initialize lastFrameTime on first frame
+    if (lastFrameTime < 0) {
+        lastFrameTime = timestamp;
+        lastTime = timestamp;
+        return; // Skip first frame to establish baseline
     }
+    
+    // Calculate time since last rendered frame
+    const deltaTime = timestamp - lastFrameTime;
+    
+    // Accumulate time - this handles fractional frame times properly
+    frameTimeAccumulator += deltaTime;
     lastFrameTime = timestamp;
     
-    // Schedule next frame
-    animationId = requestAnimationFrame(loop);
+    // Only process frame if enough time has accumulated (16.67ms for 60 FPS)
+    // Using >= instead of > and subtracting FRAME_MIN_TIME for precision
+    if (frameTimeAccumulator < FRAME_MIN_TIME) {
+        return; // Skip this frame, not enough time accumulated
+    }
+    
+    // Consume the frame time (keep remainder for next frame)
+    // This ensures we don't drift over time
+    frameTimeAccumulator -= FRAME_MIN_TIME;
+    
+    // Cap accumulator to prevent spiral if we fall behind
+    if (frameTimeAccumulator > FRAME_MIN_TIME) {
+        frameTimeAccumulator = 0; // Reset if we're more than 1 frame behind
+    }
     
     // Calculate elapsed time since last processed frame
     const elapsed = timestamp - lastTime;
@@ -1991,13 +2012,8 @@ function update(dt) {
     }
 }
 
-// Collision helpers treat walls as axis-aligned boxes to keep tests cheap.
-function checkWall(x, y, r) {
-    for (let w of walls) {
-        if (x > w.x - r && x < w.x + w.w + r && y > w.y - r && y < w.y + w.h + r) return true;
-    }
-    return false;
-}
+// NOTE: checkWall() is now defined in world.js (loaded before this file)
+// This ensures it's available for systems.js which also loads before gameplay.js
 
 function activateFinalWave(force = false) {
     if (finalWaveTriggered && !force) return;
@@ -2111,12 +2127,8 @@ function handleFinalWaveEscorts(dt) {
     }
 }
 
-function checkCrate(x, y, r) {
-    for (let c of crates) {
-        if (x > c.x - r && x < c.x + c.w + r && y > c.y - r && y < c.y + c.h + r) return true;
-    }
-    return false;
-}
+// NOTE: checkCrate() is now defined in world.js (loaded before this file)
+// This ensures it's available for systems.js which also loads before gameplay.js
 
 // Line-of-sight sampling prevents enemies from shooting through cover.
 function checkLineOfSight(x1, y1, x2, y2) {

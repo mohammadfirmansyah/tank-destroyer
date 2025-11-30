@@ -5,6 +5,23 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.4] - 2025-11-30
+
+### Fixed
+- 🐛 **Duplicate `TARGET_FPS` declaration** - Removed duplicate const from gameplay.js (already in config.js)
+- 🐛 **`checkWall is not defined` error** - Moved `checkWall()` and `checkCrate()` to world.js
+  - These collision functions are now available for all modules (systems.js loads before gameplay.js)
+- 🐛 **FPS limiter not working on 120Hz+ monitors** - Improved accumulator-based timing
+  - Initialize lastFrameTime to -1 for proper first frame detection
+  - Accumulate delta time with remainder preservation for precision
+  - Reset accumulator if more than 1 frame behind (prevents spiral)
+
+### Changed
+- 🔧 Collision helpers (`checkWall`, `checkCrate`) moved from gameplay.js to world.js
+- 🔧 FPS limiter now uses `FRAME_TIME` from config.js instead of local constant
+
+---
+
 ## [2.0.0-RC.3] - 2025-11-30
 
 ### Added
