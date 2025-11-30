@@ -5,6 +5,63 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.13] - 2025-12-01
+
+### Fixed
+- 💥 **Flak Cannon AOE Damage** - Now correctly deals splash damage on impact
+  - **Bug**: Flak had explosion particles but NO actual AOE damage to nearby enemies
+  - **Fix**: Added AOE damage logic + visual AOE ring indicator
+  - **AOE Radius**: 80 pixels from impact point
+  - **Splash Damage**: 35% of base damage (120 × 0.35 = 42 max splash)
+  - **Damage Falloff**: Linear based on distance from impact center
+  - **Visual**: Orange expanding ring shows blast radius
+
+- 🚀 **Rocket Launcher AOE Damage** - Increased splash damage and added visual indicator
+  - **Bug**: Rocket had visual effects but weak/no actual AOE damage
+  - **Fix**: Increased AOE damage percentage + added visual ring
+  - **AOE Radius**: 120 pixels from impact point
+  - **Splash Damage**: 50% of base damage (250 × 0.50 = 125 max splash)
+  - **Damage Falloff**: Linear based on distance from impact center
+  - **Visual**: Red expanding ring shows blast radius
+
+- 🎨 **Bullet Motion Blur Colors** - Fixed mismatched trail colors for 4 weapons
+  - **Bug**: Motion blur trail colors didn't match bullet colors
+  - **Cannon**: Was yellow `#c0a000` → Now pastel gray `#c8d0d8` (matches gray bullet)
+  - **Twin**: Was orange `#ff9944` → Now pastel green `#4ade80` (matches green bullet)
+  - **Shotgun**: Was amber `#ffaa22` → Now pastel pink `#e879f9` (matches pink bullet)
+  - **Burst**: Was blue `#44aaff` → Now pastel gold `#ffe066` (matches gold bullet)
+  - **Note**: Other weapons (sniper, flak, rocket, etc.) unchanged - already correct
+
+### Added
+- 🎯 **Visual AOE Ring Indicator** - New particle type `aoeRing`
+  - Shows players the actual blast radius of AOE weapons
+  - Outer ring expands from 60% to 100% of AOE radius
+  - Inner ring adds visual depth
+  - Color-coded: Orange for Flak, Red for Rocket
+  - Smooth fade-out as ring expands
+  - Rendered in `render.js` particle system
+
+- 🔧 **`lightenColor()` Helper Function** - Color manipulation utility
+  - Parameters: `(hexColor, percent = 30)`
+  - Blends input color toward white by specified percentage
+  - Used by `drawBulletWaterTrail()` for brighter trail colors
+
+### Technical Details
+- AOE Damage Values:
+  - **Flak Cannon**: 80px radius, 35% splash damage (was: none)
+  - **Rocket Launcher**: 120px radius, 50% splash damage (was: 40%)
+- Visual Ring Properties:
+  - Outer ring: 18 frame lifetime, expands from 60% to 100% radius
+  - Inner ring: 12 frame lifetime, expands from 30% to 70% radius
+  - Line width thins as ring expands (6px → 2px)
+  - Alpha fades smoothly (0.7 → 0)
+- Both enemy and boss collisions create AOE rings
+- Screen shake: Rocket 12-15, Flak 8-10
+- Trail lightening: 25% blend toward white for all bullet trails
+- Cannon spark particles: Changed from yellow to light steel gray
+
+---
+
 ## [2.0.0-RC.12] - 2025-12-01
 
 ### Fixed

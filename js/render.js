@@ -1562,8 +1562,31 @@ function renderLightningArc(effect, progress, fadeOut, frame) {
 
 // ============================================================================
 
+// Helper: Lighten a hex color for trail effects
+// Returns a brighter version of the input color (for bullet trails)
+function lightenColor(hexColor, percent = 30) {
+    // Parse hex color
+    let hex = hexColor.replace('#', '');
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Lighten by blending toward white
+    const factor = percent / 100;
+    const newR = Math.min(255, Math.round(r + (255 - r) * factor));
+    const newG = Math.min(255, Math.round(g + (255 - g) * factor));
+    const newB = Math.min(255, Math.round(b + (255 - b) * factor));
+    
+    return '#' + [newR, newG, newB].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
 // Helper: Draw dramatic water-trail effect behind bullets
 // Creates flowing, tapering tail effect like wake in water
+// Trail color is automatically 25% brighter than the bullet color for better visibility
 function drawBulletWaterTrail(b, color, length = 25, width = 6, fadeAlpha = 1) {
     // Validate bullet has valid position and velocity
     if (!b || typeof b.x !== 'number' || typeof b.y !== 'number') return;
@@ -1584,16 +1607,19 @@ function drawBulletWaterTrail(b, color, length = 25, width = 6, fadeAlpha = 1) {
     // Validate trailLen is finite
     if (!isFinite(trailLen)) return;
     
+    // Lighten the trail color by 25% for better visual distinction from bullet body
+    const trailColor = lightenColor(color, 25);
+    
     CTX.save();
     CTX.translate(b.x, b.y);
     CTX.rotate(angle);
     
-    // Main water trail - gradient tapering tail
+    // Main water trail - gradient tapering tail with lightened color
     const trailGrad = CTX.createLinearGradient(-trailLen, 0, 0, 0);
     trailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    trailGrad.addColorStop(0.3, color + '40');
-    trailGrad.addColorStop(0.7, color + '80');
-    trailGrad.addColorStop(1, color + 'cc');
+    trailGrad.addColorStop(0.3, trailColor + '40');
+    trailGrad.addColorStop(0.7, trailColor + '80');
+    trailGrad.addColorStop(1, trailColor + 'cc');
     
     CTX.globalAlpha = fadeAlpha * 0.7;
     CTX.fillStyle = trailGrad;
@@ -2149,14 +2175,15 @@ function drawCannonBullet(b, angle, fadeAlpha) {
     // === LAYER 9: WIND-CUTTING EFFECT - Air split in front of shell ===
     drawWindCuttingEffect(18, shellColor, 1.0, b.trailClock, fadeAlpha);
     
-    // === LAYER 10: Trailing spark particles ===
+    // === LAYER 10: Trailing spark particles - matches shell color ===
     for (let i = 0; i < 4; i++) {
         const sparkX = -15 - i * 8 + Math.sin(time * 0.2 + i * 2) * 3;
         const sparkY = Math.sin(time * 0.3 + i * 1.5) * 4;
         const sparkSize = 1.5 - i * 0.3;
         const sparkAlpha = 0.6 - i * 0.15;
         
-        CTX.fillStyle = `rgba(255, 220, 180, ${sparkAlpha * fadeAlpha})`;
+        // Use lightened shell color for spark particles (pastel version)
+        CTX.fillStyle = `rgba(184, 200, 216, ${sparkAlpha * fadeAlpha})`; // Light steel gray
         CTX.beginPath();
         CTX.arc(sparkX, sparkY, sparkSize, 0, Math.PI * 2);
         CTX.fill();
@@ -11133,20 +11160,21 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
         const bulletAngle = Math.atan2(b.vy, b.vx);
         const speed = Math.hypot(b.vx, b.vy);
         
-        // Get weapon-specific motion blur color
+        // Get weapon-specific motion blur color (pastel/lighter version of bullet color)
+        // Only cannon, twin, shotgun, burst were fixed to match their bullet colors
         const blurColors = {
-            'single': '#c0a000',    // Cannon - golden shell
-            'twin': '#ff9944',      // Twin Cannon - orange tracer
-            'spread': '#ffaa22',    // Shotgun - amber pellet
-            'sniper': '#00ff88',    // Railgun - cyan energy
-            'burst': '#44aaff',     // Burst Rifle - blue bolt
-            'flak': '#ff6600',      // Flak - orange explosive
-            'aoe': '#ff4400',       // Rocket - red missile
-            'rapid': '#ff00ff',     // Plasma - magenta
-            'pierce': '#00ffff',    // Gauss - cyan magnetic
-            'ice': '#88ddff',       // Frost - ice blue
-            'fire': '#ff6600',      // Inferno - fire orange
-            'electric': '#ffff00'   // Tesla - yellow electric
+            'single': '#c8d0d8',    // Cannon - pastel gray (matches #9ca3af bullet)
+            'twin': '#4ade80',      // Twin Cannon - pastel green (matches #10b981 bullet)
+            'spread': '#e879f9',    // Shotgun - pastel pink (matches #d946ef bullet)
+            'sniper': '#00ff88',    // Railgun - cyan energy (original)
+            'burst': '#ffe066',     // Burst Rifle - pastel gold (matches #ffd700 bullet)
+            'flak': '#ff6600',      // Flak - orange explosive (original)
+            'aoe': '#ff4400',       // Rocket - red missile (original)
+            'rapid': '#ff00ff',     // Plasma - magenta (original)
+            'pierce': '#00ffff',    // Gauss - cyan magnetic (original)
+            'ice': '#88ddff',       // Frost - ice blue (original)
+            'fire': '#ff6600',      // Inferno - fire orange (original)
+            'electric': '#ffff00'   // Tesla - yellow electric (original)
         };
         
         // Get bullet size for motion blur width
@@ -11282,6 +11310,31 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
             CTX.lineTo(0, width * 0.4);
             CTX.closePath();
             CTX.fill();
+        } else if (p.type === 'aoeRing') {
+            // AOE DAMAGE RING INDICATOR - Expanding circle showing blast radius
+            // This visual helps players understand AOE weapon effective range
+            const ratio = Math.max(0, Math.min(1, p.life / (p.maxLife || 18)));
+            
+            // Ring expands from initial size to target size
+            const progress = 1 - ratio; // 0 -> 1 as life decreases
+            const currentSize = p.size + (p.targetSize - p.size) * progress;
+            
+            // Draw outer glow ring
+            CTX.beginPath();
+            CTX.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
+            CTX.strokeStyle = p.color;
+            // Alpha fades out as ring expands
+            CTX.globalAlpha = ratio * 0.7;
+            // Ring gets thinner as it expands
+            CTX.lineWidth = Math.max(2, 6 * ratio);
+            CTX.stroke();
+            
+            // Inner glow for extra visual punch
+            CTX.beginPath();
+            CTX.arc(p.x, p.y, currentSize * 0.9, 0, Math.PI * 2);
+            CTX.globalAlpha = ratio * 0.3;
+            CTX.lineWidth = Math.max(1, 3 * ratio);
+            CTX.stroke();
         } else if (p.type === 'wave') {
             // Shockwave ring effect - expanding circle
             CTX.beginPath();

@@ -2293,6 +2293,134 @@ function handleBulletCollision(b) {
                 // Note: bulletAngle already defined at start of this collision check
                 createBulletImpact(b.x, b.y, b.type, b.color, b.dmg, bulletAngle);
                 
+                // === AOE DAMAGE FOR ROCKET AND FLAK ===
+                // Apply area damage to nearby enemies when rocket or flak bullet hits target
+                if (b.type === 'aoe' || b.type === 'flak') {
+                    const impactX = b.x;
+                    const impactY = b.y;
+                    // Rocket has larger explosion radius than flak
+                    const aoeRadius = b.type === 'aoe' ? 120 : 80;
+                    // Rocket does 50% AOE damage, flak does 35%
+                    const aoeDamagePercent = b.type === 'aoe' ? 0.50 : 0.35;
+                    
+                    // === CREATE VISUAL AOE RING INDICATOR ===
+                    // This shows players the actual AOE damage radius
+                    const ringColor = b.type === 'aoe' ? '#ff4400' : '#ff8800';
+                    const ringColor2 = b.type === 'aoe' ? '#ff6600' : '#a0522d';
+                    // Outer expanding ring (shows max radius)
+                    particles.push({
+                        x: impactX, y: impactY, vx: 0, vy: 0,
+                        life: 18, maxLife: 18,
+                        color: ringColor,
+                        size: aoeRadius * 0.6,
+                        targetSize: aoeRadius,
+                        type: 'aoeRing'
+                    });
+                    // Inner ring for visual depth
+                    particles.push({
+                        x: impactX, y: impactY, vx: 0, vy: 0,
+                        life: 12, maxLife: 12,
+                        color: ringColor2,
+                        size: aoeRadius * 0.3,
+                        targetSize: aoeRadius * 0.7,
+                        type: 'aoeRing'
+                    });
+                    
+                    // Screen shake for explosion
+                    screenShake = Math.max(screenShake, b.type === 'aoe' ? 12 : 8);
+                    
+                    // Apply damage to all nearby enemies (except the one we just hit)
+                    for (let k = 0; k < enemies.length; k++) {
+                        const nearbyEnemy = enemies[k];
+                        if (!nearbyEnemy || nearbyEnemy === enemy) continue; // Skip primary target
+                        
+                        const dist = Math.hypot(nearbyEnemy.x - impactX, nearbyEnemy.y - impactY);
+                        if (dist < aoeRadius && dist > 0) {
+                            // Skip enemies with spawn shield
+                            if (enemyHasSpawnShield(nearbyEnemy)) continue;
+                            
+                            // Damage falloff based on distance
+                            const damageFalloff = 1 - (dist / aoeRadius);
+                            let aoeDamage = b.dmg * aoeDamagePercent * damageFalloff;
+                            
+                            // Apply player damage multipliers to AOE damage
+                            const baseMult = player.baseDamageMultiplier || 1.0;
+                            const tempMult = (player.damageBoostTime > 0) ? (player.damageMultiplier || 1.0) : 1.0;
+                            aoeDamage *= baseMult * tempMult;
+                            
+                            // Check magic shield first
+                            aoeDamage = handleMagicShieldDamage(nearbyEnemy, aoeDamage);
+                            
+                            // Apply damage
+                            nearbyEnemy.hp -= aoeDamage;
+                            nearbyEnemy.hitFlash = 6;
+                            
+                            // LIFESTEAL: Apply to AOE damage too
+                            if (player.lifesteal > 0 && player.lifestealLevel > 0 && aoeDamage > 0) {
+                                const aoeHeal = aoeDamage * player.lifesteal;
+                                if (aoeHeal > 0) {
+                                    player.hp = Math.min(player.maxHp, player.hp + aoeHeal);
+                                    createLifestealHealEffect(nearbyEnemy.x, nearbyEnemy.y, player.x, player.y, aoeHeal, player.lifestealLevel);
+                                }
+                            }
+                            
+                            // Push enemy away from explosion
+                            const pushAngle = Math.atan2(nearbyEnemy.y - impactY, nearbyEnemy.x - impactX);
+                            const pushForce = 15 * damageFalloff;
+                            nearbyEnemy.x += Math.cos(pushAngle) * pushForce;
+                            nearbyEnemy.y += Math.sin(pushAngle) * pushForce;
+                            
+                            // Show AOE damage floating text
+                            if (aoeDamage > 0) {
+                                addFloatText('-' + Math.ceil(aoeDamage), nearbyEnemy.x, nearbyEnemy.y - 30, b.type === 'aoe' ? '#ff4400' : '#a0522d');
+                            }
+                            
+                            // Kill enemy if HP depleted
+                            if (nearbyEnemy.hp <= 0) {
+                                const killIdx = enemies.indexOf(nearbyEnemy);
+                                if (killIdx >= 0) killEnemy(killIdx);
+                            }
+                        }
+                    }
+                    
+                    // Also damage nearby destructible walls
+                    for (let wi = walls.length - 1; wi >= 0; wi--) {
+                        const w = walls[wi];
+                        if (!w || !w.destructible) continue;
+                        const wallCenterX = w.x + w.w / 2;
+                        const wallCenterY = w.y + w.h / 2;
+                        const dist = Math.hypot(wallCenterX - impactX, wallCenterY - impactY);
+                        if (dist < aoeRadius) {
+                            const damageFalloff = 1 - (dist / aoeRadius);
+                            const wallDamage = b.dmg * aoeDamagePercent * damageFalloff;
+                            w.hp -= wallDamage;
+                            w.lastDamageFrame = frame;
+                            if (w.hp <= 0) {
+                                createExplosion(wallCenterX, wallCenterY, '#555');
+                                score += 10;
+                                walls.splice(wi, 1);
+                                markSpatialGridDirty();
+                            }
+                        }
+                    }
+                    
+                    // Also damage nearby crates
+                    for (let ci = crates.length - 1; ci >= 0; ci--) {
+                        const c = crates[ci];
+                        if (!c) continue;
+                        const crateCenterX = c.x + c.w / 2;
+                        const crateCenterY = c.y + c.h / 2;
+                        const dist = Math.hypot(crateCenterX - impactX, crateCenterY - impactY);
+                        if (dist < aoeRadius) {
+                            const damageFalloff = 1 - (dist / aoeRadius);
+                            const crateDamage = b.dmg * aoeDamagePercent * damageFalloff;
+                            c.hp -= crateDamage;
+                            c.lastDamageFrame = frame;
+                            if (c.hp <= 0) destroyCrate(c, ci);
+                        }
+                    }
+                }
+                
                 // Resolve elemental attachment even if bullet metadata is missing
                 // Check b.element first, then b.type, then bullet color, then player.weapon as fallback
                 let bulletElement = b.element;
@@ -2586,6 +2714,78 @@ function handleBulletCollision(b) {
             // Create weapon-specific impact effect on boss (extra dramatic) with directional debris
             const bulletAngle = Math.atan2(b.vy, b.vx);
             createBulletImpact(b.x, b.y, b.type, b.color, bossDmg, bulletAngle);
+            
+            // === AOE DAMAGE FOR ROCKET AND FLAK HITTING BOSS ===
+            // When AOE weapons hit boss, also damage nearby enemies
+            if (b.type === 'aoe' || b.type === 'flak') {
+                const impactX = b.x;
+                const impactY = b.y;
+                const aoeRadius = b.type === 'aoe' ? 120 : 80;
+                const aoeDamagePercent = b.type === 'aoe' ? 0.50 : 0.35;
+                
+                // === CREATE VISUAL AOE RING INDICATOR FOR BOSS HIT ===
+                const ringColor = b.type === 'aoe' ? '#ff4400' : '#ff8800';
+                const ringColor2 = b.type === 'aoe' ? '#ff6600' : '#a0522d';
+                particles.push({
+                    x: impactX, y: impactY, vx: 0, vy: 0,
+                    life: 18, maxLife: 18,
+                    color: ringColor,
+                    size: aoeRadius * 0.6,
+                    targetSize: aoeRadius,
+                    type: 'aoeRing'
+                });
+                particles.push({
+                    x: impactX, y: impactY, vx: 0, vy: 0,
+                    life: 12, maxLife: 12,
+                    color: ringColor2,
+                    size: aoeRadius * 0.3,
+                    targetSize: aoeRadius * 0.7,
+                    type: 'aoeRing'
+                });
+                
+                screenShake = Math.max(screenShake, b.type === 'aoe' ? 15 : 10);
+                
+                // Damage nearby enemies from boss explosion
+                for (let k = 0; k < enemies.length; k++) {
+                    const nearbyEnemy = enemies[k];
+                    if (!nearbyEnemy) continue;
+                    
+                    const dist = Math.hypot(nearbyEnemy.x - impactX, nearbyEnemy.y - impactY);
+                    if (dist < aoeRadius && dist > 0) {
+                        if (enemyHasSpawnShield(nearbyEnemy)) continue;
+                        
+                        const damageFalloff = 1 - (dist / aoeRadius);
+                        let aoeDamage = b.dmg * aoeDamagePercent * damageFalloff;
+                        aoeDamage *= baseMult * tempMult; // Apply multipliers
+                        aoeDamage = handleMagicShieldDamage(nearbyEnemy, aoeDamage);
+                        
+                        nearbyEnemy.hp -= aoeDamage;
+                        nearbyEnemy.hitFlash = 6;
+                        
+                        if (player.lifesteal > 0 && player.lifestealLevel > 0 && aoeDamage > 0) {
+                            const aoeHeal = aoeDamage * player.lifesteal;
+                            if (aoeHeal > 0) {
+                                player.hp = Math.min(player.maxHp, player.hp + aoeHeal);
+                                createLifestealHealEffect(nearbyEnemy.x, nearbyEnemy.y, player.x, player.y, aoeHeal, player.lifestealLevel);
+                            }
+                        }
+                        
+                        const pushAngle = Math.atan2(nearbyEnemy.y - impactY, nearbyEnemy.x - impactX);
+                        nearbyEnemy.x += Math.cos(pushAngle) * 15 * damageFalloff;
+                        nearbyEnemy.y += Math.sin(pushAngle) * 15 * damageFalloff;
+                        
+                        if (aoeDamage > 0) {
+                            addFloatText('-' + Math.ceil(aoeDamage), nearbyEnemy.x, nearbyEnemy.y - 30, b.type === 'aoe' ? '#ff4400' : '#a0522d');
+                        }
+                        
+                        if (nearbyEnemy.hp <= 0) {
+                            const killIdx = enemies.indexOf(nearbyEnemy);
+                            if (killIdx >= 0) killEnemy(killIdx);
+                        }
+                    }
+                }
+            }
+            
             if (boss.hp <= 0) killBoss();
             return true;
         }
