@@ -156,6 +156,7 @@ tank-destroyer/
 ├── css/
 │   └── style.css           ✅ Styles
 ├── js/
+│   ├── cache-buster.js     ✅ Cache management (auto-refresh)
 │   ├── config.js           ✅ Configuration
 │   ├── world.js            ✅ Map generation
 │   ├── gameplay.js         ✅ Game loop
@@ -271,4 +272,4 @@ For deployment issues:
 ---
 
 **Last Updated:** 2025-11-30  
-**Version:** 2.0.0-rc.1
+**Version:** 2.0.0-RC.2

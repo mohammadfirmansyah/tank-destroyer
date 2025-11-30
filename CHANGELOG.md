@@ -5,6 +5,22 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.2] - 2025-11-30
+
+### Added
+- 🔄 **Cache Buster System** - Force fresh assets on every page load
+  - Automatically clears browser Cache Storage API
+  - Unregisters stale Service Workers
+  - Adds cache-busting query parameters to resources
+  - Performs hard reload on first visit per session
+  - Manual cache clear via `TankDestroyer.clearCache()`
+
+### Changed
+- 🔧 New module: `js/cache-buster.js` for cache management
+- 🔧 Modular JavaScript architecture expanded to **14 modules**
+
+---
+
 ## [2.0.0-rc.1] - 2025-11-30
 
 ### 🚀 Major Release: Ultimate Edition
