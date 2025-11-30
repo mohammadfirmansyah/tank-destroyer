@@ -1,62 +1,171 @@
-# 🎮 Tank Destroyer: Ultimate Edition v2.0.0-rc.1
+#  Tank Destroyer: Ultimate Edition v2.0.1
 
-A complete overhaul of Tank Destroyer with extensive new features including boss battles, ultimate abilities, achievements, and a comprehensive save system. This release candidate marks the transition to the Ultimate Edition.
+The official stable release of Tank Destroyer: Ultimate Edition! This version represents the culmination of extensive testing and refinement through 13 release candidates, delivering a polished and optimized gaming experience.
 
-## ✨ What's New
+##  What's New in v2.0.1
 
-### ⚡ 4 Ultimate Abilities
-- **DEVASTATOR** (Wave 1-3): Piercing beam attack - 10 kills to charge
-- **SHOCKWAVE** (Wave 4-6): Area DOT + 2s stun effect - 8 kills to charge
-- **BERSERKER** (Wave 7-9): 12s rage mode with 2.5× damage, 2× speed, invincibility
-- **CLONE ARMY** (Wave 10+): Summon 3 AI ally tanks that fight alongside you
-
-### 👹 OMEGA DESTROYER Boss Battle
-- **15,000 HP** multi-phase boss with 3 distinct phases
-- **7 Unique Turrets**: Void Lance, Frost Chain, Ember Volley, Storm Gatling, Arc Lance, Seeker Hive, Gravity Maul
-- **Special Attacks**: Dark Fire Aura, Headbutt Stun, Guard Escorts
-- **Ultimate Beam**: Devastating attack at 75%/50%/25% HP thresholds
-
-### 🏆 Achievement System
-- **40+ Achievements** across multiple categories
-- Kill milestones, wave progression, weapon mastery
-- Visual popup notifications with unlock effects
-
-### 💾 Save/Load System
-- Auto-save game progress between sessions
-- Resume interrupted games from main menu
-- Confirmation when starting new game with active save
-
-### 🎬 Cinematic Features
-- 3-page splash screen with game title, developer branding, health warning
-- AI demo battle background in main menu
-- Local fonts (Rajdhani, Black Ops One) - no CDN required
-- Full offline support with local Tailwind CSS
-
-## 🛠️ Technical Stack
-
-- **HTML5 Canvas** - GPU-optimized 2D rendering
-- **Vanilla JavaScript** - 13 modular ES6+ files (~15,000 lines)
-- **Tailwind CSS** - Local build for offline support
-- **LocalStorage** - Persistent saves and achievements
-
-## 📚 Documentation
-
-- [README.md](README.md) - Complete game documentation
-- [CHANGELOG.md](CHANGELOG.md) - Version history
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [BUILD_INFO.md](BUILD_INFO.md) - Build and deployment guide
-
-## 🚀 Play Now
-
-**[▶️ Play Tank Destroyer](https://mohammadfirmansyah.github.io/tank-destroyer/)** - No download required!
-
-## 📦 What's Included
-
-- ✅ Complete source code with 13 JavaScript modules
-- ✅ Local font files (Rajdhani, Black Ops One, Orbitron)
-- ✅ Comprehensive documentation suite
-- ✅ Offline-ready (no CDN dependencies)
+### Bug Fixes
+- **Graphics Quality on Continue/Load** - Fixed issue where graphics started at lowest quality when loading a saved game
+- **Smoother Splash Transition** - Improved animation between splash screen and homepage for seamless visual experience
 
 ---
 
-Built with ❤️ using pure JavaScript & HTML5 Canvas
+##  Complete Feature List (RC.2  v2.0.1)
+
+###  Performance & Optimization
+
+#### Smart Performance Optimizer v2
+- **Intelligent Bottleneck Detection** - Automatically identifies the real source of FPS drops:
+  - Particles (GPU fill rate)
+  - Enemies (CPU - AI calculations)  
+  - Bullets (CPU - collision detection)
+  - Tracks (CPU/GPU - bezier curve rendering)
+  - Effects (GPU - magic circles, auras)
+  - Rendering (GPU - shadows, terrain detail)
+- **6 Optimization Levels** (0-5): Full Quality  Emergency Mode
+- **Per-System Optimization Settings**: particle multiplier, shadow quality, terrain detail, track quality, AI update rate, effect detail
+- **Smart Threshold System**: Maintains full quality at 59+ FPS, only compromises when necessary
+- **Console Access**: `TankDestroyer.perfStatus()` for real-time monitoring
+- **Manual Override**: `TankDestroyer.setPerfLevel(0-5)` for testing
+
+#### 60 FPS Frame Rate Limiter
+- Caps game loop at 60 FPS maximum for power efficiency
+- Prevents unnecessary CPU/GPU usage on high refresh rate monitors
+- Consistent gameplay speed across all devices
+
+#### GPU Pre-warming System (RC.10)
+- **Canvas Pre-warm** - Draw invisible elements to prime GPU before gameplay
+- **Context Warming** - Pre-initialize canvas 2D context settings
+- **Render Pipeline Kick** - Force GPU to compile shaders before game starts
+- **Faster Quality Recovery** - Improved transition when FPS recovers
+
+#### Shadow & Rendering Optimization
+- Shadow blur is now conditional based on quality level
+- Track rendering uses simple lines at low quality (vs bezier curves)
+- Terrain detail dynamically adjusts (grass, pebbles, tire marks)
+- Bullet rendering caps and simplified motion blur at lower quality
+
+---
+
+###  Gameplay & Combat
+
+#### AOE Damage System (RC.13)
+- **Flak Cannon Area Damage** - Deals 15% damage to enemies within 80px radius
+- **Rocket Launcher Splash** - Deals 25% damage to enemies within 120px radius
+- **Visual AOE Rings** - Yellow/orange expanding rings show damage radius
+- **Balanced Mechanics** - Only affects enemies NOT directly hit by the bullet
+
+#### Bullet Visual Improvements (RC.13)
+- **Correct Motion Blur Colors** - Each weapon type now has proper trail colors:
+  - Default/Cannon: Red (#ff4444)
+  - Railgun: Cyan (#00ffff)
+  - Laser: Lime green (#00ff00)
+  - Flak: Orange (#ffaa00)
+  - Rockets: Orange-red (#ff6600)
+
+---
+
+###  UI/UX Improvements
+
+#### Achievement System Polish
+- **Achievement Popup HUD Transparency** - All HUD elements fade during popup display
+- **Refined Opacity** - HUD fades to 25% for better popup visibility
+- **Mobile Scroll Support** - Touch scrolling enabled on achievement screen
+
+#### FPS HUD Design
+- Ultra-compact design with reduced padding and border
+- Smaller font (9px) and tighter layout
+- Better visual integration with gameplay
+
+#### Splash & Homepage Transitions
+- Demo battle starts early (behind splash) for seamless background
+- Smooth overlay fade-in when showing homepage
+- Reduced animation timing for snappier feel
+
+---
+
+###  Mobile & Cross-Platform
+
+#### Mobile Browser Optimization
+- **Glitch-Free Resize Handling** - Debounced resize events on mobile
+- **Orientation Change Support** - Multi-stage handling for smooth rotation
+- **Canvas Glitch Prevention** - Multi-step clear process before transitions
+- **Touch Event Handling** - Proper gesture support for scrollable UI
+
+#### Chrome Mobile Cache Fix (RC.10)
+- Fixed issue where Chrome mobile served stale cached files
+- Implemented proper cache-busting for reliable updates
+
+---
+
+###  Technical Improvements
+
+#### Smooth Performance Transitions (RC.7)
+- Quality changes now smoothly transition over multiple frames
+- `PERF_LERP_SPEED = 0.08` for buttery smooth transitions
+- Prevents jarring visual changes when optimizer adjusts quality
+
+#### Game State Management
+- Graphics quality properly resets on game load/continue
+- Frame timing state reset on game start
+- Visibility and focus handlers for tab switching/PWA support
+
+#### Build & Debug Tools
+- `DEBUG_FPS_LIMITER` toggle for testing without FPS cap
+- `DEBUG_SMART_PERFORMANCE` toggle for optimizer testing
+- Silent pre-warm logs (reduced console spam)
+
+---
+
+##  Technical Stack
+
+- **Pure JavaScript** - No frameworks, maximum performance
+- **HTML5 Canvas** - Hardware-accelerated 2D rendering
+- **Web Audio API** - Dynamic sound effects and music
+- **Local Storage** - Save/load game progress
+- **Service Worker** - Offline support and caching
+
+---
+
+##  Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/mfirmansyahidris/game-tank-destroyer.git
+
+# Open in browser (no build required!)
+# Simply open index.html or use a local server:
+npx serve .
+```
+
+---
+
+##  Documentation
+
+- [README.md](README.md) - Complete game documentation
+- [CHANGELOG.md](CHANGELOG.md) - Detailed version history
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+
+---
+
+##  Version History Summary
+
+| Version | Key Changes |
+|---------|-------------|
+| v2.0.1 | Graphics on load fix, smoother splash transition |
+| RC.13 | AOE damage, visual rings, bullet trail colors |
+| RC.12 | Achievement HUD transparency refinement |
+| RC.11 | Achievement popup, game start graphics, prewarm logs |
+| RC.10 | GPU pre-warm, faster recovery, Chrome mobile cache |
+| RC.9 | Mobile GPU compatibility improvements |
+| RC.8 | Shadow optimization, canvas glitch prevention |
+| RC.7 | Canvas glitch prevention, FPS HUD design, smooth transitions |
+| RC.6 | Mobile game start glitch, achievement scroll, FPS counter |
+| RC.5 | Smart Performance Optimizer v2, mobile resize fixes |
+| RC.4 | FPS limiter fix for 120Hz+, collision function moves |
+| RC.3 | 60 FPS frame rate limiter |
+| RC.2 | Initial v2.0.0 release candidate |
+
+---
+
+Built with  using vanilla JavaScript and HTML5 Canvas
