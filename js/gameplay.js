@@ -446,6 +446,12 @@ let perfTotalTime = 0;
 let avgFrameTime = 16.67;
 let adaptiveQuality = 1.0; // 1.0 = full quality, lower = reduced effects
 
+// === FPS LIMITER SYSTEM ===
+// Caps frame rate at 60 FPS for consistent gameplay and power efficiency
+const TARGET_FPS = 60;
+const FRAME_MIN_TIME = 1000 / TARGET_FPS; // Minimum time between frames (16.67ms)
+let lastFrameTime = 0;
+
 // === FIXED TIMESTEP SYSTEM ===
 // Accumulates time and runs physics in fixed steps to ensure consistent speed
 // regardless of frame rate. Prevents speed-up during lag.
@@ -458,9 +464,22 @@ let accumulatedTime = 0;
 // This prevents the game from speeding up when FPS drops
 function loop(timestamp) {
     if ((state !== 'GAME' && state !== 'MISSION_FAIL') || paused) return;
+    
+    // === FPS LIMITER ===
+    // Skip frame if not enough time has passed since last frame
+    // This caps the frame rate at TARGET_FPS (60) for consistent gameplay
+    const timeSinceLastFrame = timestamp - lastFrameTime;
+    if (timeSinceLastFrame < FRAME_MIN_TIME) {
+        // Schedule next frame check but don't process this one
+        animationId = requestAnimationFrame(loop);
+        return;
+    }
+    lastFrameTime = timestamp;
+    
+    // Schedule next frame
     animationId = requestAnimationFrame(loop);
     
-    // Calculate elapsed time since last frame
+    // Calculate elapsed time since last processed frame
     const elapsed = timestamp - lastTime;
     lastTime = timestamp;
     

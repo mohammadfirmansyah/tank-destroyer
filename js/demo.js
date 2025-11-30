@@ -543,11 +543,26 @@ const DEMO_FIXED_TIMESTEP = 16.67;
 const DEMO_MAX_ACCUMULATED = 100;
 let demoAccumulatedTime = 0;
 
+// === FPS LIMITER FOR DEMO ===
+const DEMO_TARGET_FPS = 60;
+const DEMO_FRAME_MIN_TIME = 1000 / DEMO_TARGET_FPS;
+let demoLastFrameTime = 0;
+
 // Main demo battle loop - uses fixed timestep for consistent speed
 function demoBattleLoop() {
     if (!demoActive) return;
     
     const now = performance.now();
+    
+    // === FPS LIMITER ===
+    // Skip frame if not enough time has passed
+    const timeSinceLastFrame = now - demoLastFrameTime;
+    if (timeSinceLastFrame < DEMO_FRAME_MIN_TIME) {
+        demoAnimationFrame = requestAnimationFrame(demoBattleLoop);
+        return;
+    }
+    demoLastFrameTime = now;
+    
     const elapsed = now - demoLastTime;
     demoLastTime = now;
     

@@ -5,6 +5,21 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-RC.3] - 2025-11-30
+
+### Added
+- ⏱️ **60 FPS Frame Rate Limiter** - Stable and consistent frame rate
+  - Caps game loop at 60 FPS maximum for power efficiency
+  - Prevents unnecessary CPU/GPU usage on high refresh rate monitors
+  - Consistent gameplay speed across all devices
+  - Applied to both main game loop and demo battle background
+
+### Changed
+- 🔧 Improved frame timing with `FRAME_MIN_TIME` check before processing
+- 🔧 Demo battle now also uses 60 FPS limiter for consistency
+
+---
+
 ## [2.0.0-RC.2] - 2025-11-30
 
 ### Added
