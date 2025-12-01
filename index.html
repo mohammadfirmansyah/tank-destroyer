@@ -132,8 +132,8 @@
 
         <div id="boss-warning">⚠ MOTHERSHIP DETECTED ⚠</div>
         
-        <!-- FPS Debug HUD (only visible when DEBUG_SHOW_FPS=true) -->
-        <div id="fps-hud" class="fps-hud" style="display: none;">
+        <!-- FPS Debug HUD (only visible when DEBUG_SHOW_FPS=true or during homepage hold) -->
+        <div id="fps-hud" class="fps-hud" style="display: none; opacity: 0;">
             <span id="fps-value" class="fps-value">-- FPS</span>
             <span class="fps-separator">│</span>
             <span id="fps-avg" class="fps-avg">avg --</span>
@@ -190,7 +190,44 @@
         </div>
         
         <!-- Version Number -->
-        <div class="version-number">v2.0.1</div>
+        <div class="version-number">v2.0.3</div>
+    </div>
+    
+    <!-- Demo Benchmark HUD - Shows when holding homepage background -->
+    <div id="demo-benchmark-hud" class="demo-benchmark-hud">
+        <div class="benchmark-header">
+            <div class="benchmark-title">BENCHMARK MODE</div>
+            <div class="benchmark-quality">
+                <span class="quality-badge" id="bench-quality-badge">ULTRA</span>
+                <span class="quality-level" id="bench-quality-level">Level 0</span>
+            </div>
+        </div>
+        <div class="benchmark-stats">
+            <div class="benchmark-row">
+                <span class="benchmark-label">FPS</span>
+                <span id="bench-fps" class="benchmark-value fps-value">--</span>
+            </div>
+            <div class="benchmark-row">
+                <span class="benchmark-label">AVG</span>
+                <span id="bench-avg" class="benchmark-value">--</span>
+            </div>
+            <div class="benchmark-row">
+                <span class="benchmark-label">MIN</span>
+                <span id="bench-min" class="benchmark-value">--</span>
+            </div>
+            <div class="benchmark-row">
+                <span class="benchmark-label">MAX</span>
+                <span id="bench-max" class="benchmark-value">--</span>
+            </div>
+            <div class="benchmark-row">
+                <span class="benchmark-label">MS</span>
+                <span id="bench-ms" class="benchmark-value">--</span>
+            </div>
+        </div>
+        <div class="benchmark-footer">
+            <span class="benchmark-resolution-label">RENDER</span>
+            <span class="benchmark-resolution" id="bench-resolution">-- × -- (---%)</span>
+        </div>
     </div>
 
     <div id="achievements-screen" class="hidden">

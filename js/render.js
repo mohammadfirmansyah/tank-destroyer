@@ -16,11 +16,16 @@ let viewportTop = 0;
 let viewportBottom = 0;
 
 // Update viewport bounds - call at start of draw()
+// Uses display dimensions for viewport calculations (same as camera)
 function updateViewportBounds() {
+    // Use display dimensions for viewport (matches camera calculation)
+    // This ensures culling works correctly with resolution scaling
+    const vw = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
     viewportLeft = camX;
-    viewportRight = camX + CANVAS.width;
+    viewportRight = camX + vw;
     viewportTop = camY;
-    viewportBottom = camY + CANVAS.height;
+    viewportBottom = camY + vh;
 }
 
 // Check if a point is within the viewport (with optional margin for large objects)
@@ -5127,6 +5132,26 @@ function draw() {
     // GPU Optimization: Reset transform state once at start to prevent transform accumulation
     CTX.setTransform(1, 0, 0, 1, 0, 0);
     
+    // Check if resolution scaling is enabled via debug flag
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    
+    // Get resolution scale for proper rendering (only if debug flag enabled)
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    
+    // Apply resolution scale to CTX - this scales all rendering to fit the smaller buffer
+    // Camera uses displayWidth/displayHeight, so we need to scale rendering to match
+    // Only applies if resolution scaling is enabled via debug flag
+    if (resScale !== 1.0) {
+        CTX.scale(resScale, resScale);
+    }
+    
+    // Use DISPLAY dimensions for viewport calculations (same as camera)
+    // This ensures rendering area matches camera calculations from gameplay.js
+    const vw = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
+    
     // Sanitize camera position to prevent floating point glitches
     // Round to nearest pixel to avoid subpixel rendering artifacts
     if (isNaN(camX) || isNaN(camY)) {
@@ -5145,8 +5170,8 @@ function draw() {
     const tileSize = 40;
     const viewLeft = Math.floor(camX / tileSize) * tileSize;
     const viewTop = Math.floor(camY / tileSize) * tileSize;
-    const viewRight = viewLeft + CANVAS.width + tileSize * 2;
-    const viewBottom = viewTop + CANVAS.height + tileSize * 2;
+    const viewRight = viewLeft + vw + tileSize * 2;
+    const viewBottom = viewTop + vh + tileSize * 2;
     
     // Get terrain detail level from Smart Performance Optimizer
     const terrainDetail = typeof getTerrainDetail === 'function' ? getTerrainDetail() : 1.0;
@@ -5254,10 +5279,11 @@ function draw() {
     // Skip track rendering entirely if quality is 0 (emergency mode)
     if (trackQuality > 0) {
     
+    // Use display dimensions for culling (not buffer size) to prevent edge clipping during resolution scaling
     const trackViewLeft = camX - 100;
-    const trackViewRight = camX + CANVAS.width + 100;
+    const trackViewRight = camX + vw + 100;
     const trackViewTop = camY - 100;
-    const trackViewBottom = camY + CANVAS.height + 100;
+    const trackViewBottom = camY + vh + 100;
     
     // Render tracks with GRADIENT OPACITY - older tracks (low index) more transparent,
     // newer tracks (high index) more solid. Creates smooth tail-to-head fade effect.
@@ -5421,7 +5447,8 @@ function draw() {
     const shadowQuality = typeof getShadowQuality === 'function' ? getShadowQuality() : 1.0;
 
     for (let w of walls) {
-        if (w.x < camX + CANVAS.width && w.x + w.w > camX && w.y < camY + CANVAS.height && w.y + w.h > camY) {
+        // Use display dimensions for culling (not buffer size) during resolution scaling
+        if (w.x < camX + vw && w.x + w.w > camX && w.y < camY + vh && w.y + w.h > camY) {
             // Apply shake effect if exists
             const shakeX = w.shakeX || 0;
             const shakeY = w.shakeY || 0;
@@ -5577,7 +5604,8 @@ function draw() {
         }
     }
     for (let c of crates) {
-        if (c.x < camX + CANVAS.width && c.x + c.w > camX && c.y < camY + CANVAS.height && c.y + c.h > camY) drawCrate(c);
+        // Use display dimensions for culling (not buffer size) during resolution scaling
+        if (c.x < camX + vw && c.x + c.w > camX && c.y < camY + vh && c.y + c.h > camY) drawCrate(c);
     }
     
     // Type-specific visual effects for item drops
@@ -8397,19 +8425,9 @@ function draw() {
         
         // === UNIFIED ENEMY STATUS PANEL ===
         // Use unified status panel system for consistent HP + status bar display
-        // Get screen coordinates from drawTank (stored in CTX._lastTankScreenX/Y)
-        const enemyScreenX = CTX._lastTankScreenX || (e.x + exShake);
-        const enemyScreenY = CTX._lastTankScreenY || (e.y + eyShake);
-        
-        // Draw unified status panel with HP and all status effects
-        CTX.save();
-        if (CTX.resetTransform) {
-            CTX.resetTransform();
-        } else {
-            CTX.setTransform(1, 0, 0, 1, 0, 0);
-        }
-        drawUnifiedStatusPanel(enemyScreenX, enemyScreenY, e, 'enemy', frame);
-        CTX.restore();
+        // Draw in world space (camera transform already applied)
+        // This ensures consistent rendering with player status bars
+        drawUnifiedStatusPanel(e.x + exShake, e.y + eyShake, e, 'enemy', frame);
         
         // === MAGIC SHIELD RENDERING ===
         // Draw active magic shield around enemy
@@ -9988,9 +10006,9 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
         for (const clone of playerClones) {
             if (!clone || clone.hp <= 0) continue;
             
-            // Skip if outside view
-            if (clone.x < camX - 100 || clone.x > camX + CANVAS.width + 100 ||
-                clone.y < camY - 100 || clone.y > camY + CANVAS.height + 100) continue;
+            // Skip if outside view (use display dimensions for correct culling during resolution scaling)
+            if (clone.x < camX - 100 || clone.x > camX + vw + 100 ||
+                clone.y < camY - 100 || clone.y > camY + vh + 100) continue;
             
             // Spawn animation - dramatic teleport effect matching warmup duration
             const cloneSpawnMax = clone.spawnAnimationMax || SPAWN_WARMUP_FRAMES;
@@ -10106,19 +10124,9 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
             
             // === UNIFIED CLONE STATUS PANEL ===
             // Use unified status panel system for consistent HP + status bar display
-            // Get screen coordinates from drawTank (stored in CTX._lastTankScreenX/Y)
-            const cloneScreenX = CTX._lastTankScreenX || clone.x;
-            const cloneScreenY = CTX._lastTankScreenY || clone.y;
-            
-            // Draw unified status panel with HP and all status effects
-            CTX.save();
-            if (CTX.resetTransform) {
-                CTX.resetTransform();
-            } else {
-                CTX.setTransform(1, 0, 0, 1, 0, 0);
-            }
-            drawUnifiedStatusPanel(cloneScreenX, cloneScreenY, clone, 'clone', frame);
-            CTX.restore();
+            // Draw in world space (camera transform already applied)
+            // This ensures consistent rendering with player status bars
+            drawUnifiedStatusPanel(clone.x, clone.y, clone, 'clone', frame);
             
             CTX.restore();
         }
@@ -12510,17 +12518,36 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
 
 // Draw fog of war effect - creates immersive battlefield atmosphere with animated fog
 // Covers entire screen evenly with smooth rounded corners, dramatic and suspenseful
+// Uses display dimensions and CTX.scale() to handle resolution scaling correctly
 function drawFogOfWarVignette() {
-    const w = CANVAS.width;
-    const h = CANVAS.height;
     const time = typeof frame !== 'undefined' ? frame : Date.now() * 0.06;
+    
+    CTX.save();
+    
+    // Reset transform for overlay rendering
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    
+    // Use DISPLAY dimensions (viewport size) for fog calculations
+    // This ensures fog covers the full screen regardless of resolution scaling
+    const w = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const h = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
+    
+    // Check if resolution scaling is enabled via debug flag
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    
+    // Apply resolution scale to CTX so fog renders correctly to scaled buffer
+    // Only applies if resolution scaling is enabled via debug flag
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    if (resScale !== 1.0) {
+        CTX.scale(resScale, resScale);
+    }
     
     // Adaptive sizing for landscape/portrait
     const baseSize = Math.min(w, h);
     const maxSize = Math.max(w, h);
     const isLandscape = w > h;
-    
-    CTX.save();
     
     // === LAYER 1: Base fog coverage - entire screen with uniform density ===
     // Creates atmospheric haze across the whole battlefield
@@ -12951,22 +12978,23 @@ function drawMinimap() {
         const bossMinX = (boss.x - camX) * zoom + mapW / 2;
         const bossMinY = (boss.y - camY) * zoom + mapH / 2;
         
-        // Check if boss is outside minimap view (with some margin)
-        const margin = 15;
-        const isOutside = bossMinX < margin || bossMinX > mapW - margin || 
-                          bossMinY < margin || bossMinY > mapH - margin;
+        // Check if boss is outside minimap view (with small detection margin)
+        const detectMargin = 5;
+        const isOutside = bossMinX < detectMargin || bossMinX > mapW - detectMargin || 
+                          bossMinY < detectMargin || bossMinY > mapH - detectMargin;
         
         if (isOutside) {
-            // Clamp boss position to minimap edge
-            const edgeX = Math.max(margin, Math.min(mapW - margin, bossMinX));
-            const edgeY = Math.max(margin, Math.min(mapH - margin, bossMinY));
-            
             // Calculate angle from center to boss for arrow direction
             const angleToBosse = Math.atan2(bossMinY - mapH / 2, bossMinX - mapW / 2);
             
             // Pulsing effect for visibility
             const pulse = 0.7 + Math.sin(frame * 0.15) * 0.3;
             const indicatorSize = 12 * pulse;
+            
+            // Clamp boss position to minimap edge with minimal padding
+            const edgePadding = indicatorSize * 1.2; // Account for arrow size
+            const edgeX = Math.max(edgePadding, Math.min(mapW - edgePadding, bossMinX));
+            const edgeY = Math.max(edgePadding, Math.min(mapH - edgePadding, bossMinY));
             
             MINI_CTX.save();
             MINI_CTX.translate(edgeX, edgeY);
@@ -12994,6 +13022,51 @@ function drawMinimap() {
         }
     }
 
+    // Enemy edge indicators - show enemies at minimap edge when outside view (50% opacity)
+    // This helps players track enemies that are off-screen but still a threat
+    for (let e of enemies) {
+        if (e.isDying || e.spawnWarmup > 0) continue;
+        
+        const enemyMinX = (e.x - camX) * zoom + mapW / 2;
+        const enemyMinY = (e.y - camY) * zoom + mapH / 2;
+        
+        // Check if enemy is outside minimap view
+        // Use small detection margin to determine if outside
+        const detectMargin = 5;
+        const isOutside = enemyMinX < detectMargin || enemyMinX > mapW - detectMargin || 
+                          enemyMinY < detectMargin || enemyMinY > mapH - detectMargin;
+        
+        if (isOutside) {
+            // Get enemy color based on weapon (same as inside minimap)
+            const enemyWeapon = ENEMY_TIERS[e.id]?.weapon || 'cannon';
+            const enemyTurretColor = WEAPONS[enemyWeapon]?.color || '#ffffff';
+            const enemyBodyColor = lightenColor(enemyTurretColor, 0.7);
+            
+            // Calculate indicator size (matches enemy icon in minimap)
+            const indicatorSize = 35 * zoom;
+            
+            // Clamp enemy position to minimap edge with minimal padding
+            // Edge padding should only account for indicator size to prevent clipping
+            const edgePadding = indicatorSize * 0.7; // Small padding so indicator stays visible
+            const edgeX = Math.max(edgePadding, Math.min(mapW - edgePadding, enemyMinX));
+            const edgeY = Math.max(edgePadding, Math.min(mapH - edgePadding, enemyMinY));
+            
+            // Draw diamond indicator at edge with 50% opacity
+            MINI_CTX.save();
+            MINI_CTX.globalAlpha = 0.5;
+            MINI_CTX.translate(edgeX, edgeY);
+            MINI_CTX.rotate(Math.PI / 4);
+            
+            MINI_CTX.fillStyle = enemyBodyColor;
+            MINI_CTX.beginPath();
+            MINI_CTX.rect(-indicatorSize, -indicatorSize, indicatorSize * 2, indicatorSize * 2);
+            MINI_CTX.fill();
+            
+            MINI_CTX.globalAlpha = 1;
+            MINI_CTX.restore();
+        }
+    }
+
     // Calculate player position on minimap relative to the clamped camera
     const playerMiniX = (player.x - camX) * zoom + mapW / 2;
     const playerMiniY = (player.y - camY) * zoom + mapH / 2;
@@ -13017,12 +13090,12 @@ function drawMinimap() {
 function drawRiverBorder(frame) {
     const riverWidth = typeof RIVER_WIDTH !== 'undefined' ? RIVER_WIDTH : 80;
     
-    // Only draw river sections visible on screen
+    // Only draw river sections visible on screen (use display dimensions for resolution scaling)
     const margin = riverWidth + 50;
     const viewLeft = camX - margin;
-    const viewRight = camX + CANVAS.width + margin;
+    const viewRight = camX + (typeof displayWidth !== 'undefined' ? displayWidth : CANVAS.width) + margin;
     const viewTop = camY - margin;
-    const viewBottom = camY + CANVAS.height + margin;
+    const viewBottom = camY + (typeof displayHeight !== 'undefined' ? displayHeight : CANVAS.height) + margin;
     
     // River water colors
     const time = frame * 0.02;
@@ -13383,19 +13456,25 @@ const STATUS_EFFECT_CONFIG = {
 };
 
 // Draw elegant status bar with particles and effects - NO EMOJI, larger text
-function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label, value, frame, isNegative = false) {
+// resScale parameter ensures HUD elements maintain consistent visual size during resolution scaling
+function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label, value, frame, isNegative = false, resScale = 1.0) {
     const clampedProgress = Math.max(0, Math.min(1, progress));
     const fillWidth = width * clampedProgress;
+    
+    // Scale all pixel values by resolution scale
+    const cornerRadius = Math.max(1, 4 * resScale);
+    const lineWidthScaled = Math.max(0.5, 1 * resScale);
+    const pulseRadius = Math.max(1, 2 * resScale);
     
     // Outer glow effect
     ctx.save();
     ctx.shadowColor = config.colors.glow;
-    ctx.shadowBlur = 6 + Math.sin(frame * 0.1) * 2;
+    ctx.shadowBlur = (6 + Math.sin(frame * 0.1) * 2) * resScale;
     
     // Background with rounded corners
     ctx.fillStyle = config.colors.bg;
     ctx.beginPath();
-    ctx.roundRect(x, y, width, height, 4);
+    ctx.roundRect(x, y, width, height, cornerRadius);
     ctx.fill();
     ctx.shadowBlur = 0;
     
@@ -13407,13 +13486,14 @@ function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label
         grad.addColorStop(1, config.colors.fill);
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.roundRect(x, y, fillWidth, height, 4);
+        ctx.roundRect(x, y, fillWidth, height, cornerRadius);
         ctx.fill();
         
         // Shine effect on top
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.beginPath();
-        ctx.roundRect(x + 1, y + 1, Math.max(0, fillWidth - 2), height * 0.35, [3, 3, 0, 0]);
+        const shineCornerRadius = Math.max(1, 3 * resScale);
+        ctx.roundRect(x + resScale, y + resScale, Math.max(0, fillWidth - 2 * resScale), height * 0.35, [shineCornerRadius, shineCornerRadius, 0, 0]);
         ctx.fill();
         
         // Animated pulse at fill edge
@@ -13421,16 +13501,16 @@ function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label
             const pulseAlpha = 0.4 + Math.sin(frame * 0.2) * 0.2;
             ctx.fillStyle = `rgba(255, 255, 255, ${pulseAlpha})`;
             ctx.beginPath();
-            ctx.arc(x + fillWidth - 2, y + height / 2, 2, 0, Math.PI * 2);
+            ctx.arc(x + fillWidth - (2 * resScale), y + height / 2, pulseRadius, 0, Math.PI * 2);
             ctx.fill();
         }
     }
     
     // Border
     ctx.strokeStyle = config.colors.border || config.colors.glow;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = lineWidthScaled;
     ctx.beginPath();
-    ctx.roundRect(x, y, width, height, 4);
+    ctx.roundRect(x, y, width, height, cornerRadius);
     ctx.stroke();
     
     ctx.restore();
@@ -13442,7 +13522,10 @@ function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label
 // screenX, screenY = screen coordinates (after camera transform)
 // entity = object with hp, maxHp, shieldTime, armor, etc.
 // entityType = 'player', 'enemy', 'clone', 'boss'
+// Status bars are rendered at fixed size - CTX.scale() in draw() handles resolution scaling
 function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
+    // Fixed dimensions - no manual scaling needed since CTX.scale() is applied in draw()
+    // This ensures status bars appear the same size regardless of resolution scaling
     const PANEL_WIDTH = entityType === 'boss' ? 100 : 50;
     const BAR_HEIGHT = entityType === 'boss' ? 10 : 6;
     const BAR_GAP = entityType === 'boss' ? 5 : 4;
@@ -13726,6 +13809,7 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     const orderedBars = hpBar ? [hpBar, ...otherBars] : otherBars;
     
     // Calculate panel dimensions - NO background box
+    // Fixed sizes - CTX.scale() in draw() handles resolution scaling automatically
     const LABEL_HEIGHT = 12;
     const totalBarsHeight = orderedBars.length * (BAR_HEIGHT + BAR_GAP) - BAR_GAP;
     const panelX = screenX - PANEL_WIDTH / 2;
@@ -13765,7 +13849,7 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     const labelY = panelY + 6;
     const pulse = 1 + Math.sin(frame * 0.08) * pulseIntensity * 0.3;
     
-    // Glow layers for dramatic effect
+    // Fixed font size - CTX.scale() handles resolution scaling
     CTX.font = 'bold 8px Arial';
     CTX.textAlign = 'center';
     CTX.textBaseline = 'middle';
@@ -13799,7 +13883,8 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
             bar.label,
             bar.value,
             frame,
-            bar.type === 'cursedBurn' || bar.type === 'burning' || bar.type === 'frozen' || bar.type === 'slowed' || bar.type === 'stunned'
+            bar.type === 'cursedBurn' || bar.type === 'burning' || bar.type === 'frozen' || bar.type === 'slowed' || bar.type === 'stunned',
+            1.0  // No additional scaling needed - CTX.scale() already applied
         );
     });
     
@@ -13808,6 +13893,7 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
 
 // Legacy function maintained for compatibility - now uses unified panel
 function drawStatusBar(x, y, width, height, progress, colors, label, borderColor, frame) {
+    // No manual scaling needed - CTX.scale() in draw() handles it
     const config = {
         colors: {
             fill: colors[1] || colors[0],
@@ -13818,7 +13904,7 @@ function drawStatusBar(x, y, width, height, progress, colors, label, borderColor
         particleColor: colors[0],
         icon: ''
     };
-    drawStatusBarEnhanced(CTX, x, y, width, height, progress, config, label, null, frame);
+    drawStatusBarEnhanced(CTX, x, y, width, height, progress, config, label, null, frame, false, 1.0);
 }
 
 // =============================================================================

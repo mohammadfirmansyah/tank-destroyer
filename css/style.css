@@ -37,6 +37,7 @@ body {
 }
 
 /* Canvas rendering - mobile-safe GPU hints */
+/* Blocky pixel-art look (like Minecraft) - no smoothing/blur */
 #gameCanvas,
 #minimap,
 #demo-canvas {
@@ -44,10 +45,12 @@ body {
 	 * Mobile GPU Compatibility Notes:
 	 * - Removed will-change:contents (causes glitches on Mali, Adreno GPUs)
 	 * - Removed translateZ(0) on canvas (conflicts with some mobile browsers)
-	 * - Using simpler image-rendering for cross-browser support
+	 * - Using pixelated rendering for crisp blocky look at all scales
 	 */
-	image-rendering: -webkit-optimize-contrast;
+	image-rendering: pixelated;
+	image-rendering: -moz-crisp-edges;
 	image-rendering: crisp-edges;
+	-ms-interpolation-mode: nearest-neighbor;
 	/* Backface hidden helps prevent flickering during transitions */
 	-webkit-backface-visibility: hidden;
 	backface-visibility: hidden;
@@ -1005,10 +1008,14 @@ canvas {
 	-webkit-backface-visibility: hidden;
 	/* Prevent layout shifts on mobile */
 	contain: layout style paint;
+	/* Hide cursor during gameplay - use crosshair as fallback on non-game screens */
+	cursor: none;
 }
 
 #gameCanvas.active {
 	opacity: 1;
+	/* Ensure cursor stays hidden during active gameplay */
+	cursor: none;
 }
 
 /* Blur canvas during wave intermission */
@@ -5872,4 +5879,288 @@ body.demo-active .fps-hud {
 #overlay .hold-hint {
 	/* Using !important to ensure hint isn't affected by content-hidden parent rules */
 	filter: none !important;
+}
+
+/* =====================================================================
+   DEMO BENCHMARK HUD - Comprehensive performance monitor for homepage demo
+   Shows when user holds on homepage background for benchmarking
+   ===================================================================== */
+
+.demo-benchmark-hud {
+	position: fixed;
+	bottom: clamp(140px, 22vh, 220px);
+	left: 50%;
+	transform: translateX(-50%) translateY(20px) scale(0.9);
+	z-index: 99999;
+	
+	/* Glassmorphism design - matches hold-hint style */
+	background: linear-gradient(
+		135deg,
+		rgba(40, 35, 28, 0.92) 0%,
+		rgba(30, 27, 22, 0.88) 100%
+	);
+	backdrop-filter: blur(16px) saturate(1.2);
+	-webkit-backdrop-filter: blur(16px) saturate(1.2);
+	
+	/* Styling */
+	padding: 12px 20px 10px;
+	border-radius: 8px;
+	border: 1.5px solid rgba(139, 115, 85, 0);
+	box-shadow: none;
+	
+	/* Typography */
+	font-family: 'Rajdhani', 'Consolas', monospace;
+	color: rgba(212, 197, 176, 0);
+	
+	/* Hidden by default */
+	opacity: 0;
+	pointer-events: none;
+	
+	/* Smooth transitions - matches hold-hint timing */
+	transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Active state - when benchmark mode is on */
+.demo-benchmark-hud.active {
+	opacity: 1;
+	color: rgba(212, 197, 176, 0.95);
+	border-color: rgba(180, 150, 100, 0.55);
+	transform: translateX(-50%) translateY(0) scale(1);
+	box-shadow: 
+		0 8px 32px rgba(0, 0, 0, 0.5),
+		0 0 40px rgba(139, 115, 85, 0.2),
+		0 0 80px rgba(139, 115, 85, 0.1),
+		inset 0 1px 0 rgba(255, 255, 255, 0.12),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+	animation: benchmark-pulse 2.5s ease-in-out infinite;
+}
+
+/* Subtle pulse animation - matches hold-hint pulse */
+@keyframes benchmark-pulse {
+	0%, 100% {
+		box-shadow: 
+			0 8px 32px rgba(0, 0, 0, 0.5),
+			0 0 40px rgba(139, 115, 85, 0.2),
+			0 0 80px rgba(139, 115, 85, 0.1),
+			inset 0 1px 0 rgba(255, 255, 255, 0.12),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+	}
+	50% {
+		box-shadow: 
+			0 10px 40px rgba(0, 0, 0, 0.55),
+			0 0 50px rgba(180, 150, 100, 0.3),
+			0 0 100px rgba(139, 115, 85, 0.15),
+			inset 0 1px 0 rgba(255, 255, 255, 0.15),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+	}
+}
+
+/* Mobile responsive position adjustment */
+@media (max-height: 600px) {
+	.demo-benchmark-hud {
+		bottom: clamp(100px, 15vh, 140px);
+	}
+}
+
+/* Header container */
+.demo-benchmark-hud .benchmark-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 10px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid rgba(139, 115, 85, 0.3);
+}
+
+/* Title */
+.demo-benchmark-hud .benchmark-title {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.25em;
+	text-transform: uppercase;
+	color: rgba(139, 195, 74, 0.9);
+	text-align: center;
+	text-shadow: 0 0 8px rgba(139, 195, 74, 0.3);
+}
+
+/* Quality container */
+.demo-benchmark-hud .benchmark-quality {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+}
+
+/* Quality badge */
+.demo-benchmark-hud .quality-badge {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	padding: 3px 10px;
+	border-radius: 4px;
+	background: linear-gradient(135deg, rgba(139, 195, 74, 0.25), rgba(139, 195, 74, 0.15));
+	border: 1px solid rgba(139, 195, 74, 0.4);
+	color: #a3e635;
+	text-shadow: 0 0 6px rgba(139, 195, 74, 0.4);
+}
+
+/* Quality badge colors by level */
+.demo-benchmark-hud .quality-badge.quality-ultra {
+	background: linear-gradient(135deg, rgba(139, 195, 74, 0.25), rgba(139, 195, 74, 0.15));
+	border-color: rgba(139, 195, 74, 0.4);
+	color: #a3e635;
+}
+.demo-benchmark-hud .quality-badge.quality-high {
+	background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.15));
+	border-color: rgba(34, 197, 94, 0.4);
+	color: #22c55e;
+}
+.demo-benchmark-hud .quality-badge.quality-medium {
+	background: linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(234, 179, 8, 0.15));
+	border-color: rgba(234, 179, 8, 0.4);
+	color: #eab308;
+}
+.demo-benchmark-hud .quality-badge.quality-low {
+	background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(249, 115, 22, 0.15));
+	border-color: rgba(249, 115, 22, 0.4);
+	color: #f97316;
+}
+.demo-benchmark-hud .quality-badge.quality-verylow {
+	background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.15));
+	border-color: rgba(239, 68, 68, 0.4);
+	color: #ef4444;
+}
+.demo-benchmark-hud .quality-badge.quality-emergency {
+	background: linear-gradient(135deg, rgba(220, 38, 38, 0.3), rgba(220, 38, 38, 0.2));
+	border-color: rgba(220, 38, 38, 0.5);
+	color: #dc2626;
+	animation: emergency-pulse 1s ease-in-out infinite;
+}
+
+@keyframes emergency-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.7; }
+}
+
+/* Quality level text */
+.demo-benchmark-hud .quality-level {
+	font-size: 9px;
+	font-weight: 500;
+	color: rgba(168, 153, 138, 0.7);
+	letter-spacing: 0.05em;
+}
+
+/* Stats container */
+.demo-benchmark-hud .benchmark-stats {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 12px;
+	text-align: center;
+}
+
+/* Individual stat row */
+.demo-benchmark-hud .benchmark-row {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+}
+
+/* Stat label */
+.demo-benchmark-hud .benchmark-label {
+	font-size: 8px;
+	font-weight: 600;
+	letter-spacing: 0.15em;
+	color: rgba(168, 153, 138, 0.7);
+	text-transform: uppercase;
+}
+
+/* Stat value */
+.demo-benchmark-hud .benchmark-value {
+	font-size: 14px;
+	font-weight: 700;
+	color: rgba(212, 197, 176, 0.95);
+	min-width: 36px;
+}
+
+/* FPS value color coding */
+.demo-benchmark-hud .benchmark-value.fps-value {
+	color: #a3e635;
+	text-shadow: 0 0 6px rgba(163, 230, 53, 0.4);
+}
+
+.demo-benchmark-hud .benchmark-value.fps-value.fps-caution {
+	color: #eab308;
+	text-shadow: 0 0 6px rgba(234, 179, 8, 0.4);
+}
+
+.demo-benchmark-hud .benchmark-value.fps-value.fps-warning {
+	color: #f97316;
+	text-shadow: 0 0 6px rgba(249, 115, 22, 0.4);
+}
+
+.demo-benchmark-hud .benchmark-value.fps-value.fps-critical {
+	color: #ef4444;
+	text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+/* Footer container */
+.demo-benchmark-hud .benchmark-footer {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid rgba(139, 115, 85, 0.2);
+}
+
+/* Resolution label */
+.demo-benchmark-hud .benchmark-resolution-label {
+	font-size: 8px;
+	font-weight: 600;
+	letter-spacing: 0.15em;
+	color: rgba(168, 153, 138, 0.5);
+	text-transform: uppercase;
+}
+
+/* Resolution value */
+.demo-benchmark-hud .benchmark-resolution {
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	color: rgba(212, 197, 176, 0.8);
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+	.demo-benchmark-hud {
+		padding: 10px 14px 8px;
+		bottom: clamp(120px, 18vh, 160px);
+	}
+	
+	.demo-benchmark-hud .benchmark-stats {
+		gap: 8px;
+	}
+	
+	.demo-benchmark-hud .benchmark-value {
+		font-size: 12px;
+	}
+	
+	.demo-benchmark-hud .benchmark-label {
+		font-size: 7px;
+	}
+	
+	.demo-benchmark-hud .benchmark-header {
+		gap: 4px;
+		margin-bottom: 8px;
+		padding-bottom: 8px;
+	}
+	
+	.demo-benchmark-hud .quality-badge {
+		font-size: 10px;
+		padding: 2px 8px;
+	}
 }

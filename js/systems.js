@@ -7267,25 +7267,49 @@ function createExplosion(x, y, c) {
     }, 50);
 }
 
+// Track first kill of each wave for guaranteed weapon drop
+let waveFirstKillTracker = { wave: 0, hadFirstKill: false };
+
 // Loot table mirrors arcade shooters: common energy packs, rarer weapons, and
 // legendary streak boosts. Guaranteed drops are used for crates/bosses.
 // Higher tier enemies have better drop rates for rare items.
 // Progressive weapon system: only spawn weapons slightly better than current weapon
 // FIXED: Each weapon type can only drop ONCE - no duplicate weapon pickups on ground
+// FEATURE: First kill of each wave guarantees weapon drop if player needs upgrade
 function spawnDrop(x, y, guaranteed = false, enemyTier = 0) {
-    const noDropChance = Math.max(0.15, 0.35 - (enemyTier * 0.05));
-    if (!guaranteed && Math.random() < noDropChance) return;
-
     const currentWave = player.currentWave || 1;
     const currentWeaponRarity = WEAPONS[player.weapon]?.rarity || 1;
     const sequentialTier = typeof getWeaponTier === 'function' ? getWeaponTier(player.weapon) : null;
     const playerTier = sequentialTier !== null ? sequentialTier : currentWeaponRarity;
     
-    // Get maximum weapon tier from WEAPON_TIER_ORDER (gauss = tier 9)
-    const maxWeaponTier = typeof WEAPON_TIER_ORDER !== 'undefined' ? WEAPON_TIER_ORDER.length : 9;
+    // Get maximum weapon tier from WEAPON_TIER_ORDER (gauss = tier 12)
+    const maxWeaponTier = typeof WEAPON_TIER_ORDER !== 'undefined' ? WEAPON_TIER_ORDER.length : 12;
     
     // Check if player already has max tier weapon - no more weapon upgrades possible
     const playerAtMaxTier = playerTier >= maxWeaponTier;
+    
+    // === FIRST KILL GUARANTEED WEAPON DROP SYSTEM ===
+    // Reset tracker when entering new wave
+    if (waveFirstKillTracker.wave !== currentWave) {
+        waveFirstKillTracker = { wave: currentWave, hadFirstKill: false };
+    }
+    
+    // Check if this is first kill of wave and player needs weapon upgrade
+    // Player needs upgrade if their tier is less than wave's max tier (wave + 1)
+    // Example: Wave 1 allows up to tier 2, so player with tier 1 should get upgrade
+    const targetTierForWave = currentWave + 1;
+    const playerNeedsUpgrade = !playerAtMaxTier && playerTier < targetTierForWave;
+    const isFirstKill = !waveFirstKillTracker.hadFirstKill;
+    const shouldGuaranteeWeapon = isFirstKill && playerNeedsUpgrade;
+    
+    // Mark first kill as done
+    if (isFirstKill) {
+        waveFirstKillTracker.hadFirstKill = true;
+    }
+    
+    // Skip no-drop chance if this is guaranteed or first kill needs weapon
+    const noDropChance = Math.max(0.15, 0.35 - (enemyTier * 0.05));
+    if (!guaranteed && !shouldGuaranteeWeapon && Math.random() < noDropChance) return;
     
     // FIXED: Track weapons already on ground to prevent duplicates
     // Each weapon type can only exist ONCE as a pickup at any time
@@ -7343,6 +7367,12 @@ function spawnDrop(x, y, guaranteed = false, enemyTier = 0) {
             ?? WEAPONS[item.id]?.rarity 
             ?? 1;
         
+        // BALANCED WEAPON DISTRIBUTION for waves 1-11:
+        // Ensures player can reach tier 12 (gauss) by wave 11 with even progression
+        // Maximum tier allowed = wave + 1 (wave 1 → tier 2, wave 11 → tier 12)
+        const maxTierForWave = currentWave + 1;
+        if (itemTier > maxTierForWave) return false;
+        
         // Only allow weapons with tier strictly higher than player's current tier
         // and at most 1 tier above (progressive upgrade system)
         if (itemTier <= playerTier) return false;
@@ -7364,6 +7394,39 @@ function spawnDrop(x, y, guaranteed = false, enemyTier = 0) {
     const shieldPack = { id: 'shield', t: 'SHIELD GUARD', short: 'SH', c: '#3b82f6', rarity: 1 };
     const armorPack = { id: 'armor', t: 'ARMOR PLATING', short: 'AR', c: '#78716c', rarity: 1 };
 
+    // === GUARANTEED WEAPON DROP FOR FIRST KILL ===
+    // If player needs upgrade and this is first kill, force weapon drop
+    if (shouldGuaranteeWeapon) {
+        // Build weapon pool based on player's current tier (next tier weapon)
+        const nextTier = playerTier + 1;
+        const allWeapons = [
+            { id: 'twin', t: 'TWIN CANNON', short: 'TW', c: '#00ffaa', rarity: 2 },
+            { id: 'shotgun', t: 'SCATTER GUN', short: 'SG', c: '#d946ef', rarity: 3 },
+            { id: 'sniper', t: 'RAILGUN', short: 'RG', c: '#ffffff', rarity: 4 },
+            { id: 'burst', t: 'BURST RIFLE', short: 'BR', c: '#fbbf24', rarity: 5 },
+            { id: 'ice', t: 'FROST CANNON', short: 'FC', c: '#38bdf8', rarity: 6 },
+            { id: 'fire', t: 'INFERNO GUN', short: 'IF', c: '#f97316', rarity: 7 },
+            { id: 'flak', t: 'FLAK CANNON', short: 'FK', c: '#fb923c', rarity: 8 },
+            { id: 'rocket', t: 'ROCKET LAUNCHER', short: 'RL', c: '#f43f5e', rarity: 9 },
+            { id: 'electric', t: 'TESLA RIFLE', short: 'TR', c: '#facc15', rarity: 10 },
+            { id: 'laser', t: 'PLASMA BEAM', short: 'PB', c: '#38bdf8', rarity: 11 },
+            { id: 'gauss', t: 'GAUSS RIFLE', short: 'GS', c: '#a78bfa', rarity: 12 }
+        ];
+        
+        // Find the weapon for next tier that's not already on ground
+        let guaranteedWeapon = allWeapons.find(w => {
+            const weaponTier = (typeof getWeaponTier === 'function' ? getWeaponTier(w.id) : null) ?? w.rarity;
+            return weaponTier === nextTier && !weaponsOnGround.has(w.id);
+        });
+        
+        if (guaranteedWeapon) {
+            type = { ...guaranteedWeapon };
+            pickups.push({ x, y, type: { ...type }, life: 1000, floatY: 0 });
+            return; // Exit early - weapon guaranteed
+        }
+        // If no weapon found (e.g., already on ground), fall through to normal drop
+    }
+
     if (rand < commonThreshold) {
         const pool = [
             hpPack, 
@@ -7379,29 +7442,31 @@ function spawnDrop(x, y, guaranteed = false, enemyTier = 0) {
         else if (roll < 0.88) type = armorPack;
         else type = pool[4]; // Auto-aim ~12% chance in common pool
     } else if (rand < uncommonThreshold) {
+        // Tier 2-3 weapons (twin, shotgun) - available from wave 1
         let pool = [
-            { id: 'twin', t: 'TWIN CANNON', short: 'TW', c: '#00ffaa', rarity: 2 },
-            { id: 'shotgun', t: 'SCATTER GUN', short: 'SG', c: '#d946ef', rarity: 2 }
+            { id: 'twin', t: 'TWIN CANNON', short: 'TW', c: '#00ffaa', rarity: 2, minWave: 1 },
+            { id: 'shotgun', t: 'SCATTER GUN', short: 'SG', c: '#d946ef', rarity: 3, minWave: 2 }
         ];
         pool = filterPool(pool);
         type = selectFromPool(pool, energyPack);
     } else if (rand < rareThreshold) {
+        // Tier 4-7 weapons - distributed across waves 3-6
         let pool = [
-            { id: 'sniper', t: 'RAILGUN', short: 'RG', c: '#ffffff', rarity: 3 },
-            { id: 'burst', t: 'BURST RIFLE', short: 'BR', c: '#fbbf24', rarity: 3 },
-            { id: 'flak', t: 'FLAK CANNON', short: 'FK', c: '#fb923c', rarity: 3 },
-            { id: 'ice', t: 'FROST CANNON', short: 'FC', c: '#38bdf8', rarity: 6, minWave: 3 },
-            { id: 'fire', t: 'INFERNO GUN', short: 'IF', c: '#f97316', rarity: 6, minWave: 3 },
+            { id: 'sniper', t: 'RAILGUN', short: 'RG', c: '#ffffff', rarity: 4, minWave: 3 },
+            { id: 'burst', t: 'BURST RIFLE', short: 'BR', c: '#fbbf24', rarity: 5, minWave: 4 },
+            { id: 'ice', t: 'FROST CANNON', short: 'FC', c: '#38bdf8', rarity: 6, minWave: 5 },
+            { id: 'fire', t: 'INFERNO GUN', short: 'IF', c: '#f97316', rarity: 7, minWave: 6 },
             { id: 'stealth', t: 'STEALTH FIELD', short: 'ST', c: '#c084fc', rarity: 3, duration: 720, isRarePower: true, minWave: 2 },
             { id: 'lifesteal', t: 'LIFESTEAL CORE', short: 'LS', c: '#fb7185', rarity: 3, duration: 600, lifesteal: 0.15, isRarePower: true, minWave: 3 }
         ];
         pool = filterPool(pool);
         type = selectFromPool(pool, shieldPack);
     } else if (rand < epicThreshold) {
+        // Tier 8-10 weapons - distributed across waves 7-9
         let pool = [
-            { id: 'rocket', t: 'ROCKET LAUNCHER', short: 'RL', c: '#f43f5e', rarity: 4 },
-            { id: 'laser', t: 'PLASMA BEAM', short: 'PB', c: '#38bdf8', rarity: 4 },
-            { id: 'electric', t: 'TESLA RIFLE', short: 'TR', c: '#facc15', rarity: 7, minWave: 4 },
+            { id: 'flak', t: 'FLAK CANNON', short: 'FK', c: '#fb923c', rarity: 8, minWave: 7 },
+            { id: 'rocket', t: 'ROCKET LAUNCHER', short: 'RL', c: '#f43f5e', rarity: 9, minWave: 8 },
+            { id: 'electric', t: 'TESLA RIFLE', short: 'TR', c: '#facc15', rarity: 10, minWave: 9 },
             { id: 'hp_max', t: 'MAX HP UP', short: 'HP+', c: '#166534', rarity: 4 },
             { id: 'en_max', t: 'MAX ENERGY UP', short: 'EN+', c: '#155e75', rarity: 4 },
             { id: 'turbo', t: 'TURBO DRIVE', short: 'TD', c: '#fb923c', rarity: 4, duration: 480, speedBoost: 9, charges: 1, isRarePower: true, minWave: 4 },
@@ -7410,8 +7475,10 @@ function spawnDrop(x, y, guaranteed = false, enemyTier = 0) {
         pool = filterPool(pool);
         type = selectFromPool(pool, armorPack);
     } else if (rand < legendaryThreshold) {
+        // Tier 11-12 weapons - available from wave 10-11
         let pool = [
-            { id: 'gauss', t: 'GAUSS RIFLE', short: 'GS', c: '#a78bfa', rarity: 5 },
+            { id: 'laser', t: 'PLASMA BEAM', short: 'PB', c: '#38bdf8', rarity: 11, minWave: 10 },
+            { id: 'gauss', t: 'GAUSS RIFLE', short: 'GS', c: '#a78bfa', rarity: 12, minWave: 11 },
             { id: 'streak', t: 'ULTIMATE CHARGE', short: 'UC', c: '#fbbf24', rarity: 5 }
         ];
         pool = filterPool(pool);

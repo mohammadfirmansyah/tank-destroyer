@@ -10,21 +10,56 @@ let lastWidth = 0;
 let lastHeight = 0;
 
 // Robust resize function with mobile glitch prevention
+// NOTE: Resolution scaling only applies if DEBUG_ENABLE_RESOLUTION_SCALING is true in config.js
+// Otherwise canvas always renders at native resolution
 function resize() {
     // Get actual viewport dimensions
     const newWidth = window.innerWidth;
     const newHeight = window.innerHeight;
     
-    // Skip if dimensions haven't actually changed (prevents glitch loops)
+    // Store display dimensions globally for camera/viewport calculations
+    // This prevents zoom effect when resolution scaling is active
+    displayWidth = newWidth;
+    displayHeight = newHeight;
+    
+    // Check if resolution scaling is enabled via debug flag
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    
+    // Get current resolution scale (only applies if debug flag is enabled)
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    
+    // Calculate buffer dimensions based on resolution scale
+    const bufferWidth = Math.floor(newWidth * resScale);
+    const bufferHeight = Math.floor(newHeight * resScale);
+    
+    // Skip if display dimensions haven't actually changed
+    // Check display dimensions, not buffer, to properly detect window resize
     if (newWidth === lastWidth && newHeight === lastHeight) return;
     
-    // Update tracked dimensions
+    // Update tracked dimensions (use display dimensions for resize detection)
     lastWidth = newWidth;
     lastHeight = newHeight;
     
-    // Apply dimensions to canvas
-    CANVAS.width = newWidth;
-    CANVAS.height = newHeight;
+    // Apply dimensions to canvas internal buffer
+    CANVAS.width = bufferWidth;
+    CANVAS.height = bufferHeight;
+    
+    // Apply CSS dimensions for display (upscaling if resolution scale < 1)
+    CANVAS.style.width = newWidth + 'px';
+    CANVAS.style.height = newHeight + 'px';
+    
+    // ALWAYS use pixelated rendering for consistent blocky pixel-art look
+    // This applies to all graphics levels, not just when resolution scaling is active
+    CANVAS.style.imageRendering = 'pixelated';
+    CANVAS.style.imageRendering = '-moz-crisp-edges';
+    CANVAS.style.imageRendering = 'crisp-edges';
+    
+    // Disable image smoothing for crisp pixel-art look
+    if (typeof CTX !== 'undefined' && CTX) {
+        CTX.imageSmoothingEnabled = false;
+    }
     
     // Reset joystick state on resize/orientation change to prevent input bugs
     if (typeof resetVirtualJoysticks === 'function') {
@@ -440,8 +475,13 @@ function spawnPlayer() {
     player.spawnWarmupMax = SPAWN_WARMUP_FRAMES;
     
     resize();
-    camX = player.x - CANVAS.width / 2;
-    camY = player.y - CANVAS.height / 2;
+    
+    // Use display dimensions for camera to prevent zoom when resolution scaling is active
+    // displayWidth/displayHeight represent the actual viewport, not the scaled canvas buffer
+    const vw = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
+    camX = player.x - vw / 2;
+    camY = player.y - vh / 2;
 }
 
 // Calculate wave-based stat multipliers for enemy scaling

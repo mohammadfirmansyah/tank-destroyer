@@ -49,9 +49,21 @@ function startDemo() {
     demoAreaOffsetX = margin + Math.random() * (WORLD_W - DEMO_AREA_SIZE - margin * 2);
     demoAreaOffsetY = margin + Math.random() * (WORLD_H - DEMO_AREA_SIZE - margin * 2);
     
-    // Use main game canvas
-    CANVAS.width = window.innerWidth;
-    CANVAS.height = window.innerHeight;
+    // Use main game canvas - store display dimensions
+    displayWidth = window.innerWidth;
+    displayHeight = window.innerHeight;
+    
+    // Check if resolution scaling is enabled via debug flag
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    
+    // Apply resolution scaling only if debug flag is enabled
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    CANVAS.width = Math.floor(displayWidth * resScale);
+    CANVAS.height = Math.floor(displayHeight * resScale);
+    CANVAS.style.width = displayWidth + 'px';
+    CANVAS.style.height = displayHeight + 'px';
     
     // === MOBILE GPU-SAFE DEMO INITIALIZATION ===
     // Step 1: Reset canvas context state (prevents GPU state corruption on mobile)
@@ -94,9 +106,9 @@ function startDemo() {
     // Create enemies from all tiers at fixed spawn positions
     createDemoEnemies();
     
-    // Center camera on player within demo area
-    camX = Math.max(demoAreaOffsetX, Math.min(player.x - CANVAS.width / 2, demoAreaOffsetX + DEMO_AREA_SIZE - CANVAS.width));
-    camY = Math.max(demoAreaOffsetY, Math.min(player.y - CANVAS.height / 2, demoAreaOffsetY + DEMO_AREA_SIZE - CANVAS.height));
+    // Center camera on player within demo area (use display dimensions)
+    camX = Math.max(demoAreaOffsetX, Math.min(player.x - displayWidth / 2, demoAreaOffsetX + DEMO_AREA_SIZE - displayWidth));
+    camY = Math.max(demoAreaOffsetY, Math.min(player.y - displayHeight / 2, demoAreaOffsetY + DEMO_AREA_SIZE - displayHeight));
     
     // Start demo loop with delay to ensure GPU is ready
     requestAnimationFrame(() => {
@@ -661,6 +673,11 @@ function demoBattleLoop() {
     
     // Always render once per frame
     drawDemo();
+    
+    // Update FPS counter for demo benchmark mode (hold on homepage)
+    if (typeof updateFPSCounter === 'function') {
+        updateFPSCounter();
+    }
 }
 
 // Update demo simulation
@@ -674,14 +691,16 @@ function updateDemo() {
         }
     }
     
-    // Update camera to follow player
+    // Update camera to follow player (use display dimensions for consistent view)
     if (player) {
-        let tx = player.x - CANVAS.width / 2;
-        let ty = player.y - CANVAS.height / 2;
+        const vw = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+        const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
+        let tx = player.x - vw / 2;
+        let ty = player.y - vh / 2;
         let minX = demoAreaOffsetX;
         let minY = demoAreaOffsetY;
-        let maxX = Math.max(minX, demoAreaOffsetX + DEMO_AREA_SIZE - CANVAS.width);
-        let maxY = Math.max(minY, demoAreaOffsetY + DEMO_AREA_SIZE - CANVAS.height);
+        let maxX = Math.max(minX, demoAreaOffsetX + DEMO_AREA_SIZE - vw);
+        let maxY = Math.max(minY, demoAreaOffsetY + DEMO_AREA_SIZE - vh);
         camX += (tx - camX) * 0.08 * demoDt;
         camY += (ty - camY) * 0.08 * demoDt;
         camX = Math.max(minX, Math.min(camX, maxX));
@@ -2121,8 +2140,9 @@ function drawDemo() {
 
 // Draw demo title overlay - fog of war effect for cinematic main menu
 function drawDemoOverlay() {
-    const w = CANVAS.width;
-    const h = CANVAS.height;
+    // Use display dimensions for overlay (consistent regardless of resolution scale)
+    const w = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const h = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
     const time = typeof demoFrame !== 'undefined' ? demoFrame : Date.now() * 0.06;
     
     // Adaptive sizing for landscape/portrait
@@ -2130,6 +2150,18 @@ function drawDemoOverlay() {
     const isLandscape = w > h;
     
     CTX.save();
+    
+    // Reset transform for overlay (rendered at display resolution, not scaled buffer)
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    
+    // Check if resolution scaling is enabled via debug flag
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    if (resScale !== 1.0) {
+        CTX.scale(resScale, resScale);
+    }
     
     // === LAYER 1: Base fog coverage - entire screen with uniform density ===
     CTX.globalAlpha = 0.15;
@@ -2285,7 +2317,20 @@ function drawDemoOverlay() {
 // Resize handler
 window.addEventListener('resize', () => {
     if (demoActive) {
-        CANVAS.width = window.innerWidth;
-        CANVAS.height = window.innerHeight;
+        // Update display dimensions
+        displayWidth = window.innerWidth;
+        displayHeight = window.innerHeight;
+        
+        // Check if resolution scaling is enabled via debug flag
+        const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+        
+        // Apply resolution scaling only if debug flag is enabled
+        const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+            ? currentResolutionScale 
+            : 1.0;
+        CANVAS.width = Math.floor(displayWidth * resScale);
+        CANVAS.height = Math.floor(displayHeight * resScale);
+        CANVAS.style.width = displayWidth + 'px';
+        CANVAS.style.height = displayHeight + 'px';
     }
 });

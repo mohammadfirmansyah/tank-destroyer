@@ -7,6 +7,11 @@ const RIVER_WIDTH = 80; // Width of river border around the battlefield
 const RIVER_BOUNDARY = RIVER_WIDTH + 35; // Collision boundary for river (accounts for tank visual width ~30px)
 const CANVAS = document.getElementById('gameCanvas');
 
+// Display dimensions (actual viewport size) - separate from canvas buffer size
+// These are used for camera/viewport calculations to prevent zoom when resolution scaling
+let displayWidth = window.innerWidth;
+let displayHeight = window.innerHeight;
+
 // === MOBILE-COMPATIBLE CANVAS CONTEXT SETTINGS ===
 // These settings prioritize stability across all devices including mobile GPUs:
 // - alpha: false - Disables alpha channel for opaque canvas (performance boost)
@@ -19,6 +24,7 @@ const CTX = CANVAS.getContext('2d', {
 });
 
 // Apply GPU-friendly settings that work on all devices
+// Disable image smoothing for crisp pixel-art look (blocky like Minecraft)
 CTX.imageSmoothingEnabled = false;
 
 // Minimap canvas with mobile-safe settings
@@ -27,6 +33,7 @@ const MINI_CTX = MINI_CANVAS.getContext('2d', {
     alpha: true, 
     willReadFrequently: false
 });
+// Disable smoothing for crisp pixel-art look on minimap too
 MINI_CTX.imageSmoothingEnabled = false;
 const ENEMY_WALL_PADDING = 8; // Reduced to allow tanks to pass through narrow passages
 const SPAWN_WARMUP_FRAMES = 300; // 5 seconds at 60fps for dramatic spawn animation
@@ -110,7 +117,17 @@ let bossDefeated = false;
 let animationId = null;
 let lastTime = 0;
 let spawnDelay = 0;
-let mouseAim = { active: true, x: 0, y: 0, down: false, angle: 0 };  // active:true, angle:0 so mouse aim works immediately
+// Mouse control state - direction-based aiming (not screen center)
+// leftDown: fire toward mouse, rightDown: move toward mouse direction
+let mouseAim = { 
+    active: true, 
+    x: 0, 
+    y: 0, 
+    leftDown: false,   // Left-click = shoot
+    rightDown: false,  // Right-click = move
+    angle: 0,          // Direction angle from player to mouse (world coords)
+    down: false        // Legacy: true if either button down (for compatibility)
+};
 let deathSequence = { active: false, timer: 0, missionTriggered: false, stamp: 0 };
 let missionFailPending = false;
 let missionFailDelay = 0;
@@ -266,10 +283,53 @@ let smoothPerfValues = {
     shadowQuality: 1.0,
     terrainDetail: 1.0,
     trackQuality: 1.0,
-    wallDetail: 1.0
+    wallDetail: 1.0,
+    resolutionScale: 1.0  // NEW: Canvas resolution scaling (1.0 = native, 0.5 = half res)
 };
 const PERF_LERP_SPEED = 0.08; // How fast values transition when DECREASING quality
 const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING quality (instant feel)
+
+// =============================================================================
+// DEBUG: Resolution Scaling Toggle
+// Set to true to enable resolution scaling via SmartPerf (experimental)
+// Set to false to disable - canvas always renders at native resolution
+// =============================================================================
+const DEBUG_ENABLE_RESOLUTION_SCALING = false;
+
+// Track current applied resolution scale - used by resize() in world.js
+let currentResolutionScale = 1.0;
+
+// Update resolution scale value - the actual canvas resize is handled by resize() in world.js
+// This prevents double-scaling bugs where both functions try to resize canvas
+// Only applies scaling if DEBUG_ENABLE_RESOLUTION_SCALING is true
+function applyResolutionScale(scale) {
+    // If resolution scaling is disabled, always use native resolution
+    if (!DEBUG_ENABLE_RESOLUTION_SCALING) {
+        if (currentResolutionScale !== 1.0) {
+            currentResolutionScale = 1.0;
+            // Force resize to native resolution
+            if (typeof resize === 'function') {
+                if (typeof lastWidth !== 'undefined') lastWidth = 0;
+                if (typeof lastHeight !== 'undefined') lastHeight = 0;
+                resize();
+            }
+        }
+        return;
+    }
+    
+    if (scale === currentResolutionScale) return;
+    
+    // Only update the scale value - resize() will use this when it runs
+    currentResolutionScale = scale;
+    
+    // Trigger a resize to apply the new scale
+    if (typeof resize === 'function') {
+        // Force resize by temporarily clearing lastWidth/lastHeight
+        if (typeof lastWidth !== 'undefined') lastWidth = 0;
+        if (typeof lastHeight !== 'undefined') lastHeight = 0;
+        resize();
+    }
+}
 
 // Reset Smart Performance to full quality - call when starting new game
 // This ensures game always starts at highest graphics, not leftover degraded state
@@ -291,6 +351,10 @@ function resetSmartPerformance() {
     smoothPerfValues.terrainDetail = fullQuality.terrainDetail;
     smoothPerfValues.trackQuality = fullQuality.trackQuality;
     smoothPerfValues.wallDetail = fullQuality.wallDetail;
+    smoothPerfValues.resolutionScale = fullQuality.resolutionScale;
+    
+    // Reset resolution to native
+    applyResolutionScale(1.0);
     
     // Reset metrics
     smartPerfMetrics = {
@@ -334,6 +398,17 @@ function updateSmoothPerfValues() {
     smoothPerfValues.terrainDetail = lerpValue(smoothPerfValues.terrainDetail, target.terrainDetail, speed);
     smoothPerfValues.trackQuality = lerpValue(smoothPerfValues.trackQuality, target.trackQuality, speed);
     smoothPerfValues.wallDetail = lerpValue(smoothPerfValues.wallDetail, target.wallDetail, speed);
+    
+    // Handle resolution scale separately - apply immediately when changed
+    // If DEBUG_ENABLE_RESOLUTION_SCALING is false, always use 100% resolution
+    const targetResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? target.resolutionScale : 1.0;
+    const oldResScale = smoothPerfValues.resolutionScale;
+    smoothPerfValues.resolutionScale = lerpValue(smoothPerfValues.resolutionScale, targetResScale, speed * 0.5);
+    
+    // Apply resolution scale when it changes significantly (> 0.5% change)
+    if (Math.abs(smoothPerfValues.resolutionScale - currentResolutionScale) > 0.005) {
+        applyResolutionScale(smoothPerfValues.resolutionScale);
+    }
 }
 
 // Bottleneck detection counters (accumulated over check interval)
@@ -409,7 +484,7 @@ function detectBottleneck() {
 // Optimization settings per level (higher = more aggressive)
 // Now includes ALL performance-affecting settings
 const SMART_PERF_LEVELS = {
-    0: { // Full quality - no optimizations
+    0: { // Full quality - no optimizations (Ultra Graphics)
         particleMultiplier: 1.0,
         maxParticles: 500,
         cullDistance: 1500,
@@ -419,10 +494,11 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 1.0,     // All terrain details
         trackQuality: 1.0,      // Full bezier curves
         wallDetail: 1.0,        // Full wall rendering
+        resolutionScale: 1.0,   // Native resolution (blocky but full res)
         aiUpdateRate: 1,        // Update AI every frame
-        description: 'Full Quality'
+        description: 'Ultra Quality'
     },
-    1: { // Slight reduction - barely noticeable
+    1: { // Slight reduction - High quality with minor downscale
         particleMultiplier: 0.85,
         maxParticles: 350,
         cullDistance: 1300,
@@ -432,6 +508,7 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.9,     // Skip some grass blades
         trackQuality: 0.9,      // Slightly simpler curves
         wallDetail: 0.95,       // Slightly less detail
+        resolutionScale: 0.95,  // 95% resolution (slight downscale)
         aiUpdateRate: 1,        // Still every frame
         description: 'High Quality'
     },
@@ -445,6 +522,7 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.7,     // Skip pebbles & grass
         trackQuality: 0.7,      // Simpler curves
         wallDetail: 0.8,        // Skip some details
+        resolutionScale: 0.85,  // 85% resolution
         aiUpdateRate: 2,        // Update AI every 2 frames
         description: 'Medium Quality'
     },
@@ -458,6 +536,7 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.5,     // Basic terrain only
         trackQuality: 0.5,      // Simple lines
         wallDetail: 0.6,        // Basic walls
+        resolutionScale: 0.75,  // 75% resolution
         aiUpdateRate: 2,        // Every 2 frames
         description: 'Low Quality'
     },
@@ -471,6 +550,7 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.3,     // Flat colors only
         trackQuality: 0.3,      // Straight lines
         wallDetail: 0.4,        // Very basic
+        resolutionScale: 0.65,  // 65% resolution
         aiUpdateRate: 3,        // Every 3 frames
         description: 'Very Low Quality'
     },
@@ -484,6 +564,7 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.1,     // Solid colors
         trackQuality: 0,        // No tracks
         wallDetail: 0.3,        // Minimal
+        resolutionScale: 0.5,   // 50% resolution (half)
         aiUpdateRate: 4,        // Every 4 frames
         description: 'Emergency Mode'
     }
@@ -547,7 +628,12 @@ function updateSmartPerformance(currentFPS) {
             smartPerfLevel = 0; // Instant recovery to full quality
             smartPerfRecoveryFrames = 0;
             if (DEBUG_SHOW_FPS) {
-                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0`);
+                const settings = getSmartPerfSettings();
+                // If resolution scaling disabled, always show 100%
+                const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
+                const targetW = Math.round(displayWidth * effectiveResScale);
+                const targetH = Math.round(displayHeight * effectiveResScale);
+                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0 | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
             }
         }
         return;
@@ -564,7 +650,12 @@ function updateSmartPerformance(currentFPS) {
             if (levelsToJump > 0) {
                 smartPerfLevel += levelsToJump;
                 if (DEBUG_SHOW_FPS) {
-                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+                    const settings = getSmartPerfSettings();
+                    // If resolution scaling disabled, always show 100%
+                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
+                    const targetW = Math.round(displayWidth * effectiveResScale);
+                    const targetH = Math.round(displayHeight * effectiveResScale);
+                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
                 }
             }
         } else if (minFPS < warningFPS || avgFPS < warningFPS) {
@@ -573,7 +664,12 @@ function updateSmartPerformance(currentFPS) {
             if (smartPerfLevel < 5) {
                 smartPerfLevel++;
                 if (DEBUG_SHOW_FPS) {
-                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+                    const settings = getSmartPerfSettings();
+                    // If resolution scaling disabled, always show 100%
+                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
+                    const targetW = Math.round(displayWidth * effectiveResScale);
+                    const targetH = Math.round(displayHeight * effectiveResScale);
+                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
                 }
             }
         } else {
@@ -585,7 +681,12 @@ function updateSmartPerformance(currentFPS) {
                 smartPerfLevel--;
                 smartPerfRecoveryFrames = 0;
                 if (DEBUG_SHOW_FPS) {
-                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel}`);
+                    const settings = getSmartPerfSettings();
+                    // If resolution scaling disabled, always show 100%
+                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
+                    const targetW = Math.round(displayWidth * effectiveResScale);
+                    const targetH = Math.round(displayHeight * effectiveResScale);
+                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
                 }
             }
         }
@@ -677,7 +778,10 @@ if (typeof window !== 'undefined') {
     window.TankDestroyer.perfStatus = getPerfStatus;
     window.TankDestroyer.setPerfLevel = (level) => {
         smartPerfLevel = Math.max(0, Math.min(5, level));
-        console.log(`[SmartPerf] Manual level set: ${smartPerfLevel} - ${getSmartPerfSettings().description}`);
+        const settings = getSmartPerfSettings();
+        const resW = Math.round(displayWidth * settings.resolutionScale);
+        const resH = Math.round(displayHeight * settings.resolutionScale);
+        console.log(`[SmartPerf] Manual level set: ${smartPerfLevel} - ${settings.description} | Resolution: ${resW}×${resH} (${Math.round(settings.resolutionScale * 100)}%)`);
     };
 }
 
@@ -696,6 +800,7 @@ const FPS_SAMPLE_SIZE = 60; // Average over 60 samples for stability
 const FPS_UPDATE_INTERVAL = 250; // Update display every 250ms for readability
 
 // Update FPS counter calculations - call this every frame during gameplay
+// Only active when DEBUG_SHOW_FPS is enabled (not for demo benchmark - handled by main.js)
 function updateFPSCounter() {
     if (!DEBUG_SHOW_FPS) return;
     
@@ -748,26 +853,24 @@ function initFPSHUD() {
 
 // Update FPS HUD HTML element - call this at end of draw() function
 // Uses HTML element with CSS backdrop-filter for true blur effect
-// NOTE: Does NOT show during demo mode (handled by CSS)
+// Only active during gameplay when DEBUG_SHOW_FPS is enabled
 function drawFPSCounterHUD() {
-    // Only update when debug flag is enabled
+    // Only show when debug flag is enabled
     if (!DEBUG_SHOW_FPS) return;
-    
-    // Don't show during demo mode
-    if (typeof demoActive !== 'undefined' && demoActive === true) {
-        if (fpsHudElement) fpsHudElement.style.display = 'none';
-        return;
-    }
     
     // Initialize elements if not cached
     if (!fpsHudElement) {
-        initFPSHUD();
+        fpsHudElement = document.getElementById('fps-hud');
+        fpsValueElement = document.getElementById('fps-value');
+        fpsAvgElement = document.getElementById('fps-avg');
+        fpsMsElement = document.getElementById('fps-ms');
         if (!fpsHudElement) return;
     }
     
-    // Show the HUD
+    // Show HUD
     if (fpsHudElement.style.display !== 'flex') {
         fpsHudElement.style.display = 'flex';
+        fpsHudElement.style.opacity = '1';
     }
     
     // Update text content
@@ -780,10 +883,8 @@ function drawFPSCounterHUD() {
     if (fpsMsElement) fpsMsElement.textContent = `${msValue} ms`;
     
     // Update color class based on FPS performance
-    // Remove all state classes first
     fpsHudElement.classList.remove('fps-excellent', 'fps-caution', 'fps-warning', 'fps-critical');
     
-    // Add appropriate class based on FPS
     if (fpsCurrentFPS < 30) {
         fpsHudElement.classList.add('fps-critical');
     } else if (fpsCurrentFPS < 45) {

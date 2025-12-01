@@ -139,11 +139,14 @@ python -m http.server 8000
 | Key | Action |
 |-----|--------|
 | WASD | Move tank |
-| Mouse | Aim turret |
-| Left Click | Fire |
+| Mouse Move | Aim turret toward cursor |
+| Left Click | Fire toward cursor |
+| Right Click | Move toward cursor direction |
 | Arrow Keys | Aim + Auto-fire |
 | Space / Shift | Ultimate ability |
 | ESC / P | Pause |
+
+**Note**: Mouse cursor is hidden during gameplay for immersion. Turret always faces where you point!
 
 ### Mobile
 - **Left Joystick** - Movement

@@ -206,6 +206,11 @@ function startGame() {
     bossSpawned = false;
     finalWaveTriggered = false;
     
+    // Reset first kill tracker for guaranteed weapon drops
+    if (typeof waveFirstKillTracker !== 'undefined') {
+        waveFirstKillTracker = { wave: 0, hadFirstKill: false };
+    }
+    
     // CRITICAL: Reset wave transition state to prevent immediate wave skip
     waveTransition = false;
     waveTransitionTimer = 0;
@@ -696,10 +701,14 @@ function update(dt) {
         PERF_MONITOR.recordFrame(performance.now());
     }
 
-    let tx = player.x - CANVAS.width / 2;
-    let ty = player.y - CANVAS.height / 2;
-    let maxX = Math.max(0, WORLD_W - CANVAS.width);
-    let maxY = Math.max(0, WORLD_H - CANVAS.height);
+    // Use display dimensions for camera calculation to prevent zoom when resolution scaling
+    const vw = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
+    const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
+    
+    let tx = player.x - vw / 2;
+    let ty = player.y - vh / 2;
+    let maxX = Math.max(0, WORLD_W - vw);
+    let maxY = Math.max(0, WORLD_H - vh);
     camX += (tx - camX) * 0.15 * dt;
     camY += (ty - camY) * 0.15 * dt;
     camX = Math.max(0, Math.min(camX, maxX));
@@ -1057,9 +1066,15 @@ function update(dt) {
     let moveY = 0;
     if (!playerDown && !playerSpawnLocked) {
         if (input.move.active) {
+            // Touch joystick movement (highest priority)
             moveX = input.move.x;
             moveY = input.move.y;
             player.angle = input.move.angle;
+        } else if (mouseAim.rightDown && mouseAim.active) {
+            // Right-click mouse movement: move tank toward mouse direction
+            moveX = Math.cos(mouseAim.angle);
+            moveY = Math.sin(mouseAim.angle);
+            player.angle = mouseAim.angle;
         } else {
             // Desktop users rely on WASD, so we normalize the vector manually.
             if (keys.w) moveY -= 1;
@@ -1119,7 +1134,7 @@ function update(dt) {
     let isActivelyAiming = false;  // Track if player is actively providing aim input
     
     if (!playerDown) {
-        // Priority: 1. Touch joystick, 2. Keyboard arrows, 3. Mouse aim (only when clicking or recently moved)
+        // Priority: 1. Touch joystick, 2. Keyboard arrows, 3. Mouse left-click (shoot)
         if (input.aim.active) {
             // Touch joystick has highest priority
             aimAngle = input.aim.angle;
@@ -1138,8 +1153,8 @@ function update(dt) {
                 shouldFire = true;
                 isActivelyAiming = true;
             }
-        } else if (mouseAim.down) {
-            // Mouse click - aim and fire
+        } else if (mouseAim.leftDown && mouseAim.active) {
+            // Left-click mouse = aim turret and fire toward mouse position
             aimAngle = mouseAim.angle;
             shouldFire = true;
             isActivelyAiming = true;
@@ -1149,7 +1164,7 @@ function update(dt) {
     }
 
     // Track if player is manually aiming/firing BEFORE auto-aim kicks in
-    const isManualFiring = input.aim.active || mouseAim.down || keys.up || keys.down || keys.left || keys.right;
+    const isManualFiring = input.aim.active || mouseAim.leftDown || keys.up || keys.down || keys.left || keys.right;
     
     // Auto-aim only activates when player is NOT manually controlling
     let isAutoAimShot = false;

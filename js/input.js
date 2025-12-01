@@ -100,14 +100,44 @@ window.addEventListener('keyup', e => {
     if (k === 'arrowright') keys.right = false;
 });
 
-// Mouse motion provides turret aim using screen center as reference point.
+// Mouse motion provides turret aim based on mouse position relative to player (world coords)
+// This allows aiming in any direction regardless of where mouse is on screen
 window.addEventListener('mousemove', e => {
     if (state !== 'GAME' || paused) return;
     setInputMode(INPUT_MODE.DESKTOP);
-    let cx = window.innerWidth / 2;
-    let cy = window.innerHeight / 2;
-    mouseAim.active = true;
-    mouseAim.angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+    
+    // Store raw screen coordinates
+    mouseAim.screenX = e.clientX;
+    mouseAim.screenY = e.clientY;
+    
+    // Convert screen position to world position for accurate aiming
+    // Camera offset + screen position = world position
+    if (typeof camX !== 'undefined' && typeof camY !== 'undefined' && typeof player !== 'undefined') {
+        // Account for resolution scaling if active
+        const resScale = (typeof currentResolutionScale !== 'undefined') ? currentResolutionScale : 1.0;
+        
+        // Screen to world conversion: world = camera + (screen * (1/resScale))
+        // At lower resolution, each screen pixel represents more world units
+        const worldMouseX = camX + (e.clientX / resScale);
+        const worldMouseY = camY + (e.clientY / resScale);
+        
+        // Calculate angle from player to mouse position in world space
+        const dx = worldMouseX - player.x;
+        const dy = worldMouseY - player.y;
+        mouseAim.angle = Math.atan2(dy, dx);
+        mouseAim.active = true;
+        
+        // Store world coordinates for movement direction
+        mouseAim.worldX = worldMouseX;
+        mouseAim.worldY = worldMouseY;
+    }
+});
+
+// Prevent context menu on right-click during gameplay
+window.addEventListener('contextmenu', e => {
+    if (state === 'GAME' && !paused) {
+        e.preventDefault();
+    }
 });
 
 // Helper function to delay button action until push animation completes
@@ -232,13 +262,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Mouse button controls during gameplay
+// Left-click (button 0) = Shoot toward mouse direction
+// Right-click (button 2) = Move tank toward mouse direction
 window.addEventListener('mousedown', e => {
-    if (e.target.tagName === 'CANVAS') mouseAim.down = true;
+    // Only respond to canvas clicks during gameplay
+    if (e.target.tagName !== 'CANVAS') return;
     setInputMode(INPUT_MODE.DESKTOP);
+    
+    if (e.button === 0) {
+        // Left-click = shoot
+        mouseAim.leftDown = true;
+        mouseAim.down = true; // Legacy compatibility
+    } else if (e.button === 2) {
+        // Right-click = move
+        mouseAim.rightDown = true;
+    }
 });
 
-window.addEventListener('mouseup', () => {
-    mouseAim.down = false;
+window.addEventListener('mouseup', e => {
+    if (e.button === 0) {
+        mouseAim.leftDown = false;
+    } else if (e.button === 2) {
+        mouseAim.rightDown = false;
+    }
+    // Legacy: down is false only when both buttons released
+    mouseAim.down = mouseAim.leftDown || mouseAim.rightDown;
 });
 
 // Reset all input states when window loses focus or becomes hidden
@@ -253,6 +302,8 @@ function resetAllInputStates() {
     keys.left = false;
     keys.right = false;
     mouseAim.down = false;
+    mouseAim.leftDown = false;
+    mouseAim.rightDown = false;
     // NOTE: Don't reset mouseAim.active here - it should persist
     // The angle is still valid, only the firing state (down) should reset
     input.aim.active = false;

@@ -74,6 +74,7 @@ initializeGame();
 
 // ===== HOMEPAGE HOLD-TO-HIDE FEATURE =====
 // Allows users to hold on overlay background to hide UI and enjoy demo battle
+// Also shows comprehensive benchmark HUD for performance monitoring
 (function initHomepageHoldToHide() {
     const overlay = document.getElementById('overlay');
     if (!overlay) return;
@@ -88,6 +89,157 @@ initializeGame();
     let isHolding = false;
     const HOLD_DELAY = 300; // ms before triggering hide (prevents accidental triggers)
     
+    // ===== DEMO BENCHMARK SYSTEM =====
+    const benchmarkHud = document.getElementById('demo-benchmark-hud');
+    const benchFps = document.getElementById('bench-fps');
+    const benchAvg = document.getElementById('bench-avg');
+    const benchMin = document.getElementById('bench-min');
+    const benchMax = document.getElementById('bench-max');
+    const benchMs = document.getElementById('bench-ms');
+    const benchResolution = document.getElementById('bench-resolution');
+    const benchQualityBadge = document.getElementById('bench-quality-badge');
+    const benchQualityLevel = document.getElementById('bench-quality-level');
+    
+    // Quality names mapping - matches SMART_PERF_LEVELS descriptions
+    const QUALITY_NAMES = {
+        0: { name: 'ULTRA', class: 'quality-ultra' },
+        1: { name: 'HIGH', class: 'quality-high' },
+        2: { name: 'MEDIUM', class: 'quality-medium' },
+        3: { name: 'LOW', class: 'quality-low' },
+        4: { name: 'VERY LOW', class: 'quality-verylow' },
+        5: { name: 'EMERGENCY', class: 'quality-emergency' }
+    };
+    
+    // Benchmark tracking variables
+    let benchmarkActive = false;
+    let benchFrameCount = 0;
+    let benchLastTime = performance.now();
+    let benchCurrentFps = 0;
+    let benchFpsSamples = [];
+    let benchMinFps = Infinity;
+    let benchMaxFps = 0;
+    let benchAnimationFrame = null;
+    const BENCH_SAMPLE_SIZE = 120; // 2 seconds at 60fps
+    const BENCH_UPDATE_INTERVAL = 200; // Update display every 200ms
+    
+    // Start benchmark monitoring
+    function startBenchmark() {
+        benchmarkActive = true;
+        benchFrameCount = 0;
+        benchLastTime = performance.now();
+        benchFpsSamples = [];
+        benchMinFps = Infinity;
+        benchMaxFps = 0;
+        
+        // Show HUD with animation
+        if (benchmarkHud) {
+            benchmarkHud.classList.add('active');
+        }
+        
+        // Start benchmark loop
+        benchmarkLoop();
+    }
+    
+    // Stop benchmark monitoring
+    function stopBenchmark() {
+        benchmarkActive = false;
+        
+        // Hide HUD with animation
+        if (benchmarkHud) {
+            benchmarkHud.classList.remove('active');
+        }
+        
+        // Cancel animation frame
+        if (benchAnimationFrame) {
+            cancelAnimationFrame(benchAnimationFrame);
+            benchAnimationFrame = null;
+        }
+    }
+    
+    // Benchmark update loop - runs independently of game loop
+    function benchmarkLoop() {
+        if (!benchmarkActive) return;
+        
+        benchAnimationFrame = requestAnimationFrame(benchmarkLoop);
+        
+        const now = performance.now();
+        benchFrameCount++;
+        
+        const deltaTime = now - benchLastTime;
+        
+        // Update calculations at interval
+        if (deltaTime >= BENCH_UPDATE_INTERVAL) {
+            // Calculate current FPS
+            benchCurrentFps = Math.round((benchFrameCount * 1000) / deltaTime);
+            const frameTimeMs = (deltaTime / benchFrameCount).toFixed(1);
+            
+            // Add to samples
+            benchFpsSamples.push(benchCurrentFps);
+            if (benchFpsSamples.length > BENCH_SAMPLE_SIZE) {
+                benchFpsSamples.shift();
+            }
+            
+            // Calculate stats
+            const avgFps = Math.round(benchFpsSamples.reduce((a, b) => a + b, 0) / benchFpsSamples.length);
+            benchMinFps = Math.min(benchMinFps, benchCurrentFps);
+            benchMaxFps = Math.max(benchMaxFps, benchCurrentFps);
+            
+            // Update HUD elements
+            if (benchFps) {
+                benchFps.textContent = benchCurrentFps;
+                // Update color class
+                benchFps.classList.remove('fps-caution', 'fps-warning', 'fps-critical');
+                if (benchCurrentFps < 30) {
+                    benchFps.classList.add('fps-critical');
+                } else if (benchCurrentFps < 45) {
+                    benchFps.classList.add('fps-warning');
+                } else if (benchCurrentFps < 55) {
+                    benchFps.classList.add('fps-caution');
+                }
+            }
+            if (benchAvg) benchAvg.textContent = avgFps;
+            if (benchMin) benchMin.textContent = benchMinFps === Infinity ? '--' : benchMinFps;
+            if (benchMax) benchMax.textContent = benchMaxFps;
+            if (benchMs) benchMs.textContent = frameTimeMs;
+            
+            // Update quality badge and level
+            const qualityLevel = (typeof smartPerfLevel !== 'undefined') ? smartPerfLevel : 0;
+            const qualityInfo = QUALITY_NAMES[qualityLevel] || QUALITY_NAMES[0];
+            
+            if (benchQualityBadge) {
+                benchQualityBadge.textContent = qualityInfo.name;
+                // Remove all quality classes and add current one
+                benchQualityBadge.classList.remove('quality-ultra', 'quality-high', 'quality-medium', 'quality-low', 'quality-verylow', 'quality-emergency');
+                benchQualityBadge.classList.add(qualityInfo.class);
+            }
+            if (benchQualityLevel) {
+                benchQualityLevel.textContent = `Level ${qualityLevel}`;
+            }
+            
+            // Update resolution info - show TARGET resolution based on quality level
+            if (benchResolution) {
+                // Check if resolution scaling is enabled via debug flag
+                const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+                
+                // Get target resolution scale from SMART_PERF_LEVELS based on current quality level
+                // When DEBUG_ENABLE_RESOLUTION_SCALING is false, always show 100%
+                const targetScales = [1.0, 0.95, 0.85, 0.75, 0.65, 0.5]; // Level 0-5
+                const targetScale = resScalingEnabled ? (targetScales[qualityLevel] || 1.0) : 1.0;
+                
+                const dispW = (typeof displayWidth !== 'undefined') ? displayWidth : window.innerWidth;
+                const dispH = (typeof displayHeight !== 'undefined') ? displayHeight : window.innerHeight;
+                const targetW = Math.round(dispW * targetScale);
+                const targetH = Math.round(dispH * targetScale);
+                
+                benchResolution.textContent = `${targetW} × ${targetH} (${Math.round(targetScale * 100)}%)`;
+            }
+            
+            // Reset counters
+            benchFrameCount = 0;
+            benchLastTime = now;
+        }
+    }
+    
     // Check if touch/click is on background (not on buttons/interactive elements)
     function isBackgroundClick(e) {
         const target = e.target;
@@ -98,14 +250,17 @@ initializeGame();
                target.classList.contains('score-list');
     }
     
-    // Hide overlay content
+    // Hide overlay content and start benchmark
     function hideContent() {
-        if (overlay.classList.contains('hidden')) return; // Don't hide if overlay is already hidden
+        if (overlay.classList.contains('hidden')) return;
         overlay.classList.add('content-hidden');
         isHolding = true;
+        
+        // Start benchmark monitoring
+        startBenchmark();
     }
     
-    // Show overlay content
+    // Show overlay content and stop benchmark
     function showContent() {
         overlay.classList.remove('content-hidden');
         isHolding = false;
@@ -113,6 +268,9 @@ initializeGame();
             clearTimeout(holdTimer);
             holdTimer = null;
         }
+        
+        // Stop benchmark monitoring
+        stopBenchmark();
     }
     
     // Handle hold start (touch/mouse down)

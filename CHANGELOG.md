@@ -5,6 +5,276 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2025-12-01
+
+### Fixed
+- 🗺️ **Minimap Edge Indicator Size & Position** - Now matches enemy indicator and touches edge
+  - **Bug 1**: Edge indicators for off-screen enemies were too small (only 4 pixels)
+  - **Bug 2**: Edge indicators had 10-15px gap from minimap edge
+  - **Fix**: Changed indicator size to `35 * zoom` with minimal edge padding
+  - **Visual**: Edge indicators now use enemy body color instead of weapon color
+  - **Result**: Off-screen indicators are clearly visible and positioned at true edge
+
+- 🖱️ **Mouse Aiming System Overhaul** - Direction-based instead of screen-center
+  - **Bug**: Turret rotation was calculated from screen center, causing inaccurate aiming at screen edges
+  - **Fix**: Mouse position now converts to world coordinates relative to player position
+  - **Controls Reworked**:
+    - **Left-Click**: Aim and shoot toward mouse position
+    - **Right-Click**: Move tank toward mouse direction
+  - **Cursor Hidden**: Mouse cursor hidden during gameplay for immersion
+  - **Context Menu Blocked**: Right-click no longer opens browser context menu during gameplay
+  - **Result**: Intuitive point-and-click controls like top-down shooters
+
+- 🎯 **Resolution Scaling Double Rendering Bug** - Fixed blur instead of blocky pixels
+  - **Bug**: Resolution scaling was causing blurry rendering instead of crisp pixel-art
+  - **Root Cause 1**: `CTX.scale(resScale)` in draw() was applied AFTER canvas buffer resize
+    - Canvas buffer resize already handles scaling
+    - Additional CTX.scale() caused double scaling → blurry output
+  - **Root Cause 2**: `imageSmoothingEnabled` was still `true` in some code paths
+  - **Root Cause 3**: `imageRendering` CSS was not set to 'pixelated'
+  - **Fix Applied**:
+    - Removed `CTX.scale(resScale)` from main draw loop
+    - Set `imageSmoothingEnabled = false` in applyResolutionScale()
+    - Set CSS `image-rendering: pixelated` for crisp upscaling
+    - Viewport bounds now use buffer dimensions (CANVAS.width/height)
+  - **Result**: Clean, blocky Minecraft-style pixels at lower resolution settings
+
+- 🏷️ **HUD Size Scaling During Resolution Changes** - Consistent visual size
+  - **Bug**: Status bars, labels, and effects above tanks scaled up when resolution decreased
+  - **Cause**: Fixed pixel sizes rendered larger after CSS upscaling to display resolution
+  - **Fix Applied**:
+    - All HUD dimensions multiplied by `resScale` factor
+    - Font sizes, shadow blur, corner radius, line widths all scaled
+    - `drawUnifiedStatusPanel()` now uses scaled dimensions
+    - `drawStatusBarEnhanced()` receives `resScale` parameter
+    - Legacy `drawStatusBar()` also passes resolution scale
+  - **Affected Elements**:
+    - HP bars for player, enemy, clone, boss tanks
+    - Status effect bars (shield, armor, burn, freeze, etc.)
+    - Entity type labels (YOURS, ALLY, ENEMY, BOSS)
+    - Glow effects and animated pulses
+  - **Result**: HUD elements maintain consistent visual size regardless of resolution setting
+
+### Added
+- 📉 **Resolution Scaling for FPS Optimizer** - Reduces render load on lower settings
+  - **Feature**: Canvas now renders at reduced resolution when performance drops
+  - **Resolution Scale by Performance Level**:
+    - Level 0 (Ultra): 100% native resolution (blocky but full res)
+    - Level 1 (High): 95% resolution
+    - Level 2 (Medium): 85% resolution
+    - Level 3 (Low): 75% resolution
+    - Level 4 (Very Low): 65% resolution
+    - Level 5 (Emergency): 50% resolution
+  - **Pixel-Art Rendering**: Blocky upscaling like Minecraft (no blur)
+    - `imageSmoothingEnabled = false` for crisp pixels
+    - CSS `image-rendering: pixelated` for browser-level sharpness
+  - **No Zoom Effect**: Camera uses display dimensions, not buffer size
+  - **UI Preserved**: HTML elements (health bar, wave counter, etc.) stay at native resolution
+  - **Controls Unaffected**: Touch joysticks and mouse input work normally
+  - **Result**: Significant FPS improvement with retro pixel-art aesthetic
+
+- 📊 **Demo Benchmark HUD** - Comprehensive performance monitor for homepage demo
+  - **Feature**: Hold on homepage background to reveal benchmark overlay
+  - **Trigger**: Press and hold (300ms) on homepage dimmed background area
+  - **Stats Display**:
+    - **FPS**: Current frames per second with color-coded status
+    - **AVG**: Rolling average FPS over 2 seconds (120 samples)
+    - **MIN**: Lowest FPS recorded during benchmark session
+    - **MAX**: Highest FPS recorded during benchmark session
+    - **MS**: Frame time in milliseconds
+  - **Quality Info**:
+    - **Quality Badge**: Shows current graphics level (ULTRA/HIGH/MEDIUM/LOW/VERY LOW/EMERGENCY)
+    - **Level Number**: Displays SmartPerf optimization level (0-5)
+    - **Badge Colors**: Color-coded by quality level (green → yellow → orange → red)
+  - **Resolution Display**:
+    - Shows target render resolution (e.g., "960 × 540 (50%)")
+    - Updates dynamically based on quality level
+  - **Animation**:
+    - Smooth fade-in with scale effect (0.9 → 1.0)
+    - Bouncy easing: `cubic-bezier(0.34, 1.56, 0.64, 1)`
+    - Subtle pulse glow animation when active
+    - Matches "Release to Show Menu" box style
+  - **Positioning**: Appears above the "Release to Show Menu" hint box
+  - **Use Case**: Benchmark demo performance and monitor SmartPerf decisions
+  - **Result**: Professional performance monitoring without entering gameplay
+
+- 📝 **Enhanced Console Logging for Performance Optimizer**
+  - **Improvement**: Console logs now include resolution information
+  - **Format**: `Level: X - Description | Resolution: WxH (P%)`
+  - **Details Shown**:
+    - Current performance level and description
+    - Actual render resolution in pixels (width × height)
+    - Resolution scale percentage
+  - **Use Case**: Debug and monitor resolution scaling in real-time
+  - **Result**: Better visibility into performance optimizer decisions
+
+### Technical Details
+- `render.js`: Fixed edge indicator in `drawMinimap()`
+  - Changed `indicatorSize = 4` to `indicatorSize = 35 * zoom`
+  - Edge padding now uses `indicatorSize * 0.7` instead of fixed 10-15px margin
+  - Uses `enemyBodyColor` instead of weapon color for consistency
+  - Added CTX.scale() for resolution scaling at start of draw()
+  - Updated viewport bounds to use `displayWidth`/`displayHeight`
+- `config.js`: Added resolution scaling to Smart Performance Optimizer
+  - Added `displayWidth` and `displayHeight` global variables for viewport size
+  - Added `resolutionScale` property to `smoothPerfValues`
+  - Added `currentResolutionScale` tracker variable
+  - Added `applyResolutionScale(scale)` function for dynamic scaling
+  - Updated all `SMART_PERF_LEVELS` with `resolutionScale` values
+  - Updated `resetSmartPerformance()` to reset resolution to 1.0
+  - Updated `updateSmoothPerfValues()` to apply resolution changes smoothly
+  - Extended `mouseAim` object with `leftDown`, `rightDown`, `worldX`, `worldY` properties
+- `input.js`: Reworked mouse input handlers
+  - `mousemove`: Calculates angle from player to mouse in world coordinates
+  - `mousedown`: Left-click (button 0) for shooting, Right-click (button 2) for movement
+  - `mouseup`: Releases corresponding button state
+  - `contextmenu`: Prevents browser context menu during gameplay
+- `gameplay.js`: Updated player controls
+  - Camera uses `displayWidth`/`displayHeight` for consistent view
+  - Movement priority: Touch joystick > Right-click mouse > WASD
+  - Firing priority: Touch joystick > Arrow keys > Left-click mouse
+- `world.js`: Updated `resize()` function
+  - Stores display dimensions in `displayWidth`/`displayHeight`
+  - Canvas internal buffer scales with `currentResolutionScale`
+  - CSS width/height maintains viewport dimensions for upscaling
+  - Formula: `buffer = viewport × resolutionScale`, CSS = viewport
+- `demo.js`: Updated for resolution scaling consistency
+  - Uses `displayWidth`/`displayHeight` for camera calculations
+  - Applies resolution scaling in startDemo() and resize handler
+  - Overlay renders at display resolution with CTX.scale()
+- `style.css`: Added `cursor: none` to `#gameCanvas` for hidden cursor during gameplay
+- `main.js`: Added comprehensive Demo Benchmark HUD system
+  - Dedicated `#demo-benchmark-hud` element with independent animation loop
+  - `startBenchmark()`: Initializes tracking and shows HUD with animation
+  - `stopBenchmark()`: Cleans up and hides HUD on release
+  - `benchmarkLoop()`: Independent requestAnimationFrame loop for FPS calculation
+  - Tracks FPS samples, calculates AVG/MIN/MAX statistics
+  - Quality level mapping: ULTRA/HIGH/MEDIUM/LOW/VERY LOW/EMERGENCY
+  - Color-coded quality badges with CSS class switching
+  - Target resolution calculation based on quality level
+- `index.html`: Added Demo Benchmark HUD structure
+  - `#demo-benchmark-hud` with header (title + quality badge) and footer (resolution)
+  - Stats grid: FPS, AVG, MIN, MAX, MS with individual IDs
+  - Quality badge and level display elements
+- `style.css`: Added Demo Benchmark HUD styling
+  - Glassmorphism design matching hold-hint box
+  - Bouncy animation: `cubic-bezier(0.34, 1.56, 0.64, 1)`
+  - Scale transform: `scale(0.9)` → `scale(1)` on active
+  - Pulse glow animation: `benchmark-pulse 2.5s ease-in-out infinite`
+  - Color-coded quality badges (quality-ultra through quality-emergency)
+  - Responsive positioning: `bottom: clamp(140px, 22vh, 220px)`
+- `config.js`: Updated console logging with target resolution info
+  - All SmartPerf console logs now show target resolution
+  - Format: `Target Resolution: WxH (P%)`
+  - Shows width, height, and percentage based on quality level settings
+
+### Fixed (Additional)
+- 🖼️ **Viewport Culling with Resolution Scaling** - Prevents edge clipping
+  - Fixed viewport bounds calculations to use `displayWidth`/`displayHeight`
+  - Ensures all objects render correctly during resolution scaling
+  - Affected areas:
+    - Tank track rendering culling bounds
+    - Wall rendering visibility check
+    - Crate rendering visibility check
+    - Player clone rendering visibility check
+    - River border rendering visibility check
+  - **Result**: No visual artifacts at screen edges when resolution scaling is active
+
+- 🌫️ **Fog of War Stability with Resolution Scaling** - Consistent coverage
+  - **Bug**: Fog of war would shrink when resolution scaling reduced canvas buffer size
+  - **Cause**: Fog used `CANVAS.width/height` which changes with resolution scale
+  - **Fix**: Now uses `displayWidth`/`displayHeight` for fog positioning
+  - **Technical**: Added `CTX.scale(scale, scale)` to map display coords to buffer
+  - **Result**: Fog of war maintains consistent visual coverage at all quality levels
+
+- 🔍 **Double Scaling Bug in Game Screen** - Prevents zoom effect
+  - **Bug**: Game screen would zoom in when SmartPerf reduced resolution
+  - **Cause**: Both `resize()` in world.js and `applyResolutionScale()` in config.js were applying resolution scaling, causing double application
+  - **Fix**: 
+    - `resize()` now tracks display dimensions (not buffer) for resize detection
+    - `applyResolutionScale()` no longer updates world.js tracking variables
+    - Separated concerns: resize handles window changes, applyResolutionScale handles quality changes
+  - **Result**: Resolution scaling works correctly without zoom effect
+
+- 🎮 **Enemy/Clone Status Bars Coordinate System** - Consistent world-space rendering
+  - **Bug**: Enemy and clone status bars were using screen coordinates inconsistently
+  - **Cause**: Status bars were calling `CTX.resetTransform()` and using cached screen coords
+  - **Fix**: Now renders in world space like player status bars (camera transform already applied)
+  - **Result**: All entity status bars render consistently regardless of resolution scaling
+
+### Added (Additional)
+- 🔧 **DEBUG_ENABLE_RESOLUTION_SCALING Flag** - Development toggle for resolution scaling
+  - **Feature**: New debug flag in `config.js` to enable/disable resolution scaling system
+  - **Default**: `false` (disabled) - canvas always renders at native 100% resolution
+  - **When Enabled** (`true`):
+    - SmartPerf adjusts resolution based on FPS performance
+    - Resolution scales from 100% (Ultra) down to 50% (Emergency)
+    - Blocky pixel-art rendering at reduced resolutions
+  - **When Disabled** (`false`):
+    - All resolution-related code uses 100% native resolution
+    - SmartPerf still adjusts other quality settings (particles, shadows, etc.)
+    - Benchmark HUD shows 100% regardless of quality level
+  - **Affected Files**: `config.js`, `world.js`, `render.js`, `demo.js`, `main.js`
+  - **Use Case**: Toggle resolution scaling feature for testing/debugging
+  - **Result**: Easy control over experimental resolution scaling feature
+
+- 🎨 **Always-Active Blocky/Pixelated Rendering** - Consistent retro aesthetic
+  - **Feature**: Pixel-art rendering style now active at ALL quality levels
+  - **Regardless of Resolution Scale**:
+    - `imageSmoothingEnabled = false` always set
+    - CSS `image-rendering: pixelated` always applied
+  - **Result**: Crisp, blocky Minecraft-style graphics even at 100% resolution
+
+---
+
+## [2.0.2] - 2025-12-01
+
+### Added
+- 🗺️ **Minimap Edge Indicators for Enemies** - Track off-screen threats
+  - Enemies outside minimap view now show as small diamond indicators at the edge
+  - Indicators appear at 50% opacity for clear visibility without being intrusive
+  - Each indicator uses the enemy's weapon color for easy identification
+  - Helps players track enemies approaching from outside visible minimap area
+
+- 🎯 **Guaranteed Weapon Drop on First Kill** - Ensures weapon progression
+  - First kill of each wave now **guarantees** a weapon drop if player needs upgrade
+  - Trigger condition: Player's weapon tier < current wave number
+  - Drops the exact next-tier weapon player needs (e.g., wave 3 with tier 1 weapon → tier 2 weapon)
+  - Prevents RNG from blocking weapon progression
+
+### Fixed
+- ⚔️ **Balanced Weapon Drop Distribution** - Even progression from wave 1-11
+  - **Problem**: Players could get high-tier weapons too early, or miss upgrades
+  - **Fix**: Weapon drops now follow strict wave-based tier limits:
+    - Wave 1: Max Tier 2 (twin)
+    - Wave 2: Max Tier 3 (shotgun)
+    - Wave 3: Max Tier 4 (sniper)
+    - Wave 4: Max Tier 5 (burst)
+    - Wave 5: Max Tier 6 (ice)
+    - Wave 6: Max Tier 7 (fire)
+    - Wave 7: Max Tier 8 (flak)
+    - Wave 8: Max Tier 9 (rocket)
+    - Wave 9: Max Tier 10 (electric)
+    - Wave 10: Max Tier 11 (laser)
+    - Wave 11: Max Tier 12 (gauss)
+  - **Result**: Guaranteed access to highest tier weapon (gauss) by wave 11
+  - Combined with first-kill guarantee, players WILL get weapon upgrades each wave
+
+### Technical Details
+- `render.js`: Added enemy edge indicator rendering after boss edge indicator in `drawMinimap()`
+  - Uses same pattern as boss indicator but simpler (small diamond, 50% opacity)
+  - Loops through all enemies and calculates minimap position
+  - Clamps position to minimap edge when enemy is outside view
+- `systems.js`: 
+  - Added `waveFirstKillTracker` object to track first kills per wave
+  - Added `shouldGuaranteeWeapon` logic in `spawnDrop()` for first-kill weapon guarantee
+  - Updated `filterPool()` with `maxTierForWave = currentWave + 1` cap
+  - Updated minWave values for all weapons to match tier distribution
+  - Guaranteed weapon drop bypasses RNG and directly spawns next-tier weapon
+- `gameplay.js`: Reset `waveFirstKillTracker` in `startGame()` for clean state
+
+---
+
 ## [2.0.1] - 2025-12-01
 
 ### Fixed
