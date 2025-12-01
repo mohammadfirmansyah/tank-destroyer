@@ -4,10 +4,17 @@ function saveGame() {
     if (state !== 'GAME') return;
     if (player.hp <= 0) return;
 
+    // Get current music time for seamless resume
+    let musicTime = 0;
+    if (typeof MusicManager !== 'undefined' && MusicManager.getCurrentTrackName() === 'game') {
+        musicTime = MusicManager.getCurrentTime();
+    }
+
     const saveData = {
         timestamp: Date.now(),
         score,
         gameTime,
+        musicTime,  // Save music position for seamless continue
         camX,
         camY,
         waveTransition: typeof waveTransition !== 'undefined' ? !!waveTransition : false,
@@ -198,6 +205,14 @@ function loadGame() {
         // Update continue button state since save is now consumed
         if (typeof updateContinueButtonState === 'function') {
             updateContinueButtonState();
+        }
+        
+        // CRITICAL: Start game music from saved position
+        // Must be done after UI updates to ensure user interaction is registered
+        if (typeof MusicManager !== 'undefined') {
+            const savedMusicTime = saveData.musicTime || 0;
+            MusicManager.playAtTime('game', savedMusicTime);
+            console.log('[loadGame] Starting game music at time:', savedMusicTime);
         }
 
         // Start Loop immediately

@@ -31,6 +31,177 @@ const ENEMY_QUEUE_DISTANCE_BREAK = (typeof WORLD_W === 'number' && typeof WORLD_
 const ENEMY_CHASE_DISTANCE_THRESHOLD = 500; // Distance at which ALL enemies should pursue player
 const ENEMY_AVOID_LOCK_FRAMES = 120; // Increased from 60 to prevent zigzag from rapid direction changes
 
+// === PATROL/ALERT AI STATE SYSTEM ===
+// Enemies start in patrol mode with reduced speed, only becoming aggressive when:
+// 1. Turret faces player within vision cone AND player is close AND no obstacle between
+// 2. Enemy takes damage from player
+// 3. 50% or more of wave enemies are destroyed (global alert)
+const PATROL_SPEED_MULT = 0.25;           // Patrol at 25% speed (slower patrol)
+const ALERT_VISION_RANGE = 400;           // Must be within this distance to spot player
+const ALERT_VISION_ANGLE = Math.PI / 4;   // Turret must face player within 45 degrees
+const GLOBAL_ALERT_THRESHOLD = 0.5;       // Alert all when 50% enemies killed
+let waveStartEnemyCount = 0;              // Track initial enemy count for each wave
+
+// Find open directions (roads/corridors) for patrol turret scanning
+// Returns array of angles representing open paths enemy should watch
+// ONLY returns directions with clear line of sight (no walls)
+// Prioritizes directions toward lastKnownPlayerPos (suspected player location)
+function findPatrolScanPoints(enemy) {
+    const scanDist = 200; // Distance to check for open paths
+    const numRays = 16;   // Check 16 directions for better coverage
+    
+    // Calculate angle toward suspected player location
+    let suspectedAngle = enemy.angle; // Default to facing direction
+    if (enemy.lastKnownPlayerPos) {
+        suspectedAngle = Math.atan2(
+            enemy.lastKnownPlayerPos.y - enemy.y,
+            enemy.lastKnownPlayerPos.x - enemy.x
+        );
+    }
+    
+    // First pass: Find ALL open paths (directions without walls)
+    const openPaths = [];
+    for (let i = 0; i < numRays; i++) {
+        const angle = (i / numRays) * Math.PI * 2;
+        const testX = enemy.x + Math.cos(angle) * scanDist;
+        const testY = enemy.y + Math.sin(angle) * scanDist;
+        
+        // Check if this direction has line of sight (is a corridor/road, not wall)
+        if (typeof checkLineOfSight === 'function' && checkLineOfSight(enemy.x, enemy.y, testX, testY)) {
+            // Calculate how close this direction is to suspected player direction
+            let angleDiff = Math.abs(angle - suspectedAngle);
+            while (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            
+            // Priority score: lower = more important (closer to suspected direction)
+            const priority = angleDiff / Math.PI;
+            
+            openPaths.push({
+                angle: angle,
+                priority: priority
+            });
+        }
+    }
+    
+    // If no open paths found, do a finer search in suspected direction
+    if (openPaths.length === 0) {
+        // Try smaller angles around suspected direction
+        for (let offset = -Math.PI; offset <= Math.PI; offset += Math.PI / 8) {
+            const testAngle = suspectedAngle + offset;
+            const testX = enemy.x + Math.cos(testAngle) * (scanDist * 0.5);
+            const testY = enemy.y + Math.sin(testAngle) * (scanDist * 0.5);
+            
+            if (typeof checkLineOfSight === 'function' && checkLineOfSight(enemy.x, enemy.y, testX, testY)) {
+                let angleDiff = Math.abs(offset);
+                openPaths.push({
+                    angle: testAngle,
+                    priority: angleDiff / Math.PI
+                });
+            }
+        }
+    }
+    
+    // If still no open paths, just return current facing direction
+    if (openPaths.length === 0) {
+        return [{
+            angle: enemy.angle,
+            priority: 1
+        }];
+    }
+    
+    // Sort by priority - paths toward suspected player location come first
+    openPaths.sort((a, b) => a.priority - b.priority);
+    
+    // Return only the best paths (toward suspected player direction)
+    // Filter to only include paths within 90 degrees of suspected direction if possible
+    const goodPaths = openPaths.filter(p => p.priority < 0.5);
+    if (goodPaths.length > 0) {
+        return goodPaths;
+    }
+    
+    // If no paths toward player, return all open paths
+    return openPaths;
+}
+
+// Check if enemy can see player (turret facing + close + no walls blocking)
+function canEnemySpotPlayer(enemy) {
+    if (!player || player.hp <= 0) return false;
+    
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const dist = Math.hypot(dx, dy);
+    
+    // Must be within vision range
+    if (dist > (enemy.visionAlertRange || ALERT_VISION_RANGE)) return false;
+    
+    // Check if turret is facing player (within vision angle)
+    const angleToPlayer = Math.atan2(dy, dx);
+    let angleDiff = angleToPlayer - enemy.turretAngle;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    
+    const visionAngle = enemy.visionAlertAngle || ALERT_VISION_ANGLE;
+    if (Math.abs(angleDiff) > visionAngle) return false;
+    
+    // Check line of sight (no walls/crates blocking)
+    if (typeof checkLineOfSight === 'function' && !checkLineOfSight(enemy.x, enemy.y, player.x, player.y)) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Radius for alerting nearby enemies when one enemy spots player
+const ALERT_NEARBY_RADIUS = 180; // Very close proximity for info sharing
+const ALERT_SHOOT_DELAY = 60;    // Frames delay before enemy can shoot after being alerted (1 second)
+
+// Alert an enemy (switch from patrol to aggressive)
+function alertEnemy(enemy, reason, alertNearby = true) {
+    if (!enemy || enemy.aiState === 'alerted') return;
+    enemy.aiState = 'alerted';
+    enemy.alertedReason = reason;
+    // Visual feedback - animated (!) indicator above status bar
+    // 120 frames = 2 seconds of indicator visibility
+    enemy.alertIndicator = 120;
+    
+    // Set delay before enemy can shoot - gives player time to react
+    enemy.alertShootDelay = ALERT_SHOOT_DELAY;
+    
+    // Set target turret angle toward player - will smoothly rotate in update loop
+    // Do NOT snap instantly - let the turret rotation system handle it smoothly
+    if (player && player.hp > 0) {
+        enemy.targetTurretAngle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+        enemy.alertTurretTransition = true; // Flag for smooth transition
+    }
+    
+    // Alert nearby enemies within close radius (info sharing)
+    if (alertNearby && reason === 'vision') {
+        for (const other of enemies) {
+            if (other === enemy || other.hp <= 0 || other.aiState === 'alerted') continue;
+            const dist = Math.hypot(other.x - enemy.x, other.y - enemy.y);
+            if (dist <= ALERT_NEARBY_RADIUS) {
+                // Alert nearby enemy but don't chain further alerts
+                alertEnemy(other, 'ally_spotted', false);
+            }
+        }
+    }
+}
+
+// Check if global alert should trigger (50% enemies killed)
+function shouldGlobalAlert() {
+    if (waveStartEnemyCount <= 0) return false;
+    const aliveCount = enemies.filter(e => e.hp > 0).length;
+    return aliveCount <= waveStartEnemyCount * GLOBAL_ALERT_THRESHOLD;
+}
+
+// Alert all remaining enemies (called when 50% threshold reached)
+function alertAllEnemies(reason) {
+    for (const enemy of enemies) {
+        if (enemy.hp > 0 && enemy.aiState === 'patrol') {
+            alertEnemy(enemy, reason);
+        }
+    }
+}
+
 // === LIFESTEAL ACCUMULATOR SYSTEM ===
 // Accumulates lifesteal heals within a single frame to display as one combined floating text
 // This prevents multiple overlapping "+X HP" texts when hitting many enemies at once
@@ -2242,6 +2413,11 @@ function handleBulletCollision(b) {
                 // Apply remaining damage to HP
                 enemy.hp -= finalDamage;
                 
+                // ALERT ENEMY WHEN DAMAGED - switch from patrol to aggressive
+                if (finalDamage > 0 && enemy.aiState === 'patrol') {
+                    alertEnemy(enemy, 'damaged');
+                }
+                
                 // Show critical hit with dramatic effect, OR regular damage floating text
                 // FIX: Only show critical/damage if there was actual damage dealt
                 // Use damageBeforeShield for critical display (total damage, including shielded)
@@ -2872,6 +3048,8 @@ function updateEnemies(dt) {
             e.isRetreating = false;
         }
         if (e.hitFlash > 0) e.hitFlash -= dt;
+        // Decrement alert indicator timer (animated (!) above status bar)
+        if (e.alertIndicator > 0) e.alertIndicator -= dt;
         // Decrement chain explosion immunity timer
         if (e.chainExplosionImmune > 0) e.chainExplosionImmune -= dt;
         if (e.recoil === undefined) e.recoil = 0;
@@ -3314,6 +3492,10 @@ function updateEnemies(dt) {
             // FROZEN enemies cannot rotate turret - complete immobilization (same as player)
             const isFrozenForTurret = e.frozenTime && e.frozenTime > 0;
             
+            // === PATROL MODE: Smart turret scanning - look toward nearby roads/corridors ===
+            // Enemies in patrol mode should NOT aim at player - they're unaware
+            const isInPatrolMode = (e.aiState === 'patrol');
+            
             // === RECOIL RECOVERY: Slow turret tracking after firing ===
             let turretRotationMultiplier = 1.0;
             if (e.recoilRecoveryTime > 0) {
@@ -3323,8 +3505,60 @@ function updateEnemies(dt) {
                 turretRotationMultiplier = 0.03 + (1 - recoveryProgress) * 0.12;
             }
             
-            // Only aim turret at player if we have line of sight AND player is not cloaked AND not frozen
-            if (hasLOS && !playerIsCloaked && !isFrozenForTurret) {
+            // === PATROL TURRET SCANNING: Look toward nearby open paths ===
+            if (isInPatrolMode && !isFrozenForTurret) {
+                // Initialize patrol scan state
+                if (!e.patrolScanState) {
+                    e.patrolScanState = {
+                        currentIndex: 0,
+                        scanTimer: 0,
+                        scanDelay: 120 + Math.random() * 60, // 2-3 seconds between scan points
+                        lastUpdatePos: { x: e.x, y: e.y }
+                    };
+                }
+                
+                // Recalculate scan points if enemy has moved significantly
+                // This ensures turret always points toward correct directions
+                const movedDist = Math.hypot(e.x - e.patrolScanState.lastUpdatePos.x, e.y - e.patrolScanState.lastUpdatePos.y);
+                if (!e.patrolScanState.scanPoints || e.patrolScanState.scanPoints.length === 0 || movedDist > 50) {
+                    e.patrolScanState.scanPoints = findPatrolScanPoints(e);
+                    e.patrolScanState.lastUpdatePos = { x: e.x, y: e.y };
+                }
+                
+                // Update scan timer
+                e.patrolScanState.scanTimer += dt;
+                
+                // Switch to next scan point periodically
+                if (e.patrolScanState.scanTimer >= e.patrolScanState.scanDelay) {
+                    e.patrolScanState.scanTimer = 0;
+                    e.patrolScanState.currentIndex = (e.patrolScanState.currentIndex + 1) % Math.max(1, e.patrolScanState.scanPoints.length);
+                    e.patrolScanState.scanDelay = 90 + Math.random() * 90; // Vary timing
+                }
+                
+                // Get target angle to current scan point
+                // Calculate angle directly toward the scan direction from enemy's current position
+                let patrolTargetAngle = e.angle; // Default: face movement direction
+                if (e.patrolScanState.scanPoints.length > 0) {
+                    const scanPoint = e.patrolScanState.scanPoints[e.patrolScanState.currentIndex];
+                    if (scanPoint) {
+                        // Use the stored angle directly (already calculated relative to suspected player)
+                        patrolTargetAngle = scanPoint.angle;
+                    }
+                }
+                
+                // Smoothly rotate turret toward scan point
+                let diff = patrolTargetAngle - e.turretAngle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                const maxRotation = 0.03 * dt; // Slower scan rotation for natural feel
+                e.turretAngle += Math.sign(diff) * Math.min(Math.abs(diff), Math.max(maxRotation, Math.abs(diff) * 0.05 * dt));
+            }
+            // Only aim turret at player if:
+            // 1. NOT in patrol mode (enemy must be alerted first)
+            // 2. Has line of sight to player
+            // 3. Player is not cloaked
+            // 4. Not frozen
+            else if (!isInPatrolMode && hasLOS && !playerIsCloaked && !isFrozenForTurret) {
                 let aimAngle = targetAngle;
                 if (e.id >= 2) {
                     // Higher-tier bots lead their shots to punish predictable motion.
@@ -3507,6 +3741,117 @@ function updateEnemies(dt) {
                 moveAngle = e.angle;
                 speedMult = 1.0;
             }
+            
+            // === PATROL/ALERT AI STATE SYSTEM ===
+            // Check if enemy should become alerted (transition from patrol to aggressive)
+            if (!e.aiState) e.aiState = 'patrol'; // Initialize state for existing enemies
+            
+            // Check for global alert (50% enemies killed)
+            if (e.aiState === 'patrol' && shouldGlobalAlert()) {
+                alertEnemy(e, 'allies_low');
+            }
+            
+            // Check if turret can see player (vision-based alert)
+            if (e.aiState === 'patrol' && canEnemySpotPlayer(e)) {
+                alertEnemy(e, 'vision');
+            }
+            
+            // Patrol mode: slow patrol around spawn area
+            let isPatrolling = (e.aiState === 'patrol');
+            if (isPatrolling) {
+                // Patrol at reduced speed around guard point
+                speedMult *= (e.patrolSpeedMult || PATROL_SPEED_MULT);
+                
+                // Initialize unique patrol zone if not set
+                // Each enemy gets their own patrol center - AWAY from suspected player location
+                if (!e.patrolZoneCenter) {
+                    // Use spawn position as base, NOT guard point (to prevent moving toward player)
+                    const baseX = e.home.x;
+                    const baseY = e.home.y;
+                    
+                    // Calculate direction AWAY from suspected player location
+                    let awayAngle = Math.random() * Math.PI * 2; // Random if no player info
+                    if (e.lastKnownPlayerPos) {
+                        // Point away from suspected player
+                        awayAngle = Math.atan2(
+                            baseY - e.lastKnownPlayerPos.y,
+                            baseX - e.lastKnownPlayerPos.x
+                        );
+                        // Add some variance to spread out
+                        awayAngle += (Math.random() - 0.5) * Math.PI * 0.5;
+                    }
+                    
+                    // Patrol zone is offset in the direction AWAY from player
+                    const offsetDist = 80 + Math.random() * 100;
+                    let zoneX = baseX + Math.cos(awayAngle) * offsetDist;
+                    let zoneY = baseY + Math.sin(awayAngle) * offsetDist;
+                    
+                    // Clamp to world bounds
+                    zoneX = Math.max(100, Math.min(WORLD_W - 100, zoneX));
+                    zoneY = Math.max(100, Math.min(WORLD_H - 100, zoneY));
+                    
+                    e.patrolZoneCenter = { x: zoneX, y: zoneY };
+                }
+                
+                // Move toward patrol point within own patrol zone (small radius)
+                if (!e.patrolPoint) e.patrolPoint = createPatrolWaypoint(e.patrolZoneCenter, 80);
+                const distToPatrol = Math.hypot(e.patrolPoint.x - e.x, e.patrolPoint.y - e.y);
+                
+                if (distToPatrol < 50) {
+                    // Reached patrol point - pick new one within own zone
+                    e.patrolPoint = createPatrolWaypoint(e.patrolZoneCenter, 80);
+                }
+                
+                moveAngle = Math.atan2(e.patrolPoint.y - e.y, e.patrolPoint.x - e.x);
+                
+                // === PATROL BOUNDARY: Don't move toward suspected player location ===
+                // If movement would bring us closer to lastKnownPlayerPos, reduce speed or reverse
+                if (e.lastKnownPlayerPos) {
+                    const currentDistToSuspected = Math.hypot(e.x - e.lastKnownPlayerPos.x, e.y - e.lastKnownPlayerPos.y);
+                    const nextX = e.x + Math.cos(moveAngle) * 10;
+                    const nextY = e.y + Math.sin(moveAngle) * 10;
+                    const nextDistToSuspected = Math.hypot(nextX - e.lastKnownPlayerPos.x, nextY - e.lastKnownPlayerPos.y);
+                    
+                    // If moving closer to suspected location, pick opposite direction
+                    if (nextDistToSuspected < currentDistToSuspected - 5) {
+                        moveAngle += Math.PI; // Reverse direction
+                        // Get new patrol point away from player
+                        e.patrolPoint = createPatrolWaypoint(e.patrolZoneCenter, 80);
+                    }
+                }
+                
+                // === PATROL SEPARATION: Push away from other patrolling enemies ===
+                // This prevents patrol tanks from clustering together
+                const PATROL_SEPARATION_DIST = 180; // Distance at which patrol tanks repel
+                const PATROL_SEPARATION_STRENGTH = 0.4;
+                
+                let sepX = 0, sepY = 0;
+                for (const other of enemies) {
+                    if (other === e || other.hp <= 0 || other.aiState !== 'patrol') continue;
+                    const dx = e.x - other.x;
+                    const dy = e.y - other.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < PATROL_SEPARATION_DIST && d > 0) {
+                        const pushStrength = (PATROL_SEPARATION_DIST - d) / PATROL_SEPARATION_DIST;
+                        sepX += (dx / d) * pushStrength;
+                        sepY += (dy / d) * pushStrength;
+                    }
+                }
+                
+                // Apply separation to move angle
+                if (sepX !== 0 || sepY !== 0) {
+                    const sepAngle = Math.atan2(sepY, sepX);
+                    const sepMag = Math.hypot(sepX, sepY);
+                    
+                    // Blend separation with patrol movement
+                    const blendWeight = Math.min(1, sepMag * PATROL_SEPARATION_STRENGTH);
+                    let angleDiff = sepAngle - moveAngle;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    moveAngle += angleDiff * blendWeight;
+                }
+            }
+            
             const unstuckOverride = consumeUnstuckVector(e, dt);
             let usingCover = false;
             let pursuingDetour = false;
@@ -3646,30 +3991,44 @@ function updateEnemies(dt) {
                 e.hidingBehindAlly = false;
             }
             
-            // ADVANCED AI: Dodge incoming player bullets (higher tier = better reflexes)
+            // ADVANCED AI: Dodge incoming player bullets
+            // All tiers can dodge, but higher tier = better reflexes and tighter dodges
+            // Lower tiers react slower and dodge less effectively
             let isDodging = false;
-            if (intelligence >= 3 && !e.frozenTime && !e.stunnedTime) {
-                const dodgeResult = detectIncomingBullets(e, intelligence);
-                if (dodgeResult) {
-                    // Apply dodge maneuver
-                    isDodging = true;
-                    
-                    // Blend dodge with current movement (don't completely override)
-                    const dodgeWeight = 0.6 + (intelligence * 0.05); // Higher tier = more committed dodge
-                    moveAngle = blendAngles(moveAngle, dodgeResult.angle, dodgeWeight);
-                    speedMult = Math.max(speedMult, dodgeResult.strength);
-                    
-                    // Visual feedback for dodge (occasional spark)
-                    if (Math.random() < 0.1) {
-                        particles.push({
-                            x: e.x + (Math.random() - 0.5) * 20,
-                            y: e.y + (Math.random() - 0.5) * 20,
-                            vx: Math.cos(dodgeResult.angle) * 2,
-                            vy: Math.sin(dodgeResult.angle) * 2,
-                            life: 10,
-                            color: '#fbbf24',
-                            size: 2
-                        });
+            if (!e.frozenTime && !e.stunnedTime) {
+                // Calculate effective dodge intelligence (minimum 1 for all enemies)
+                const dodgeIntel = Math.max(1, intelligence);
+                
+                // Dodge check frequency based on tier (lower tier = less frequent checks)
+                // Tier 0-2: 50% chance to check dodge each frame
+                // Tier 3+: 100% chance to check dodge
+                const shouldCheckDodge = intelligence >= 3 || Math.random() < (0.3 + intelligence * 0.1);
+                
+                if (shouldCheckDodge) {
+                    const dodgeResult = detectIncomingBullets(e, dodgeIntel);
+                    if (dodgeResult) {
+                        // Apply dodge maneuver
+                        isDodging = true;
+                        
+                        // Blend dodge with current movement (don't completely override)
+                        // Lower tiers have weaker dodge commitment (0.4-0.55), higher tiers (0.6-0.85)
+                        const baseDodgeWeight = intelligence >= 3 ? 0.6 : 0.35;
+                        const dodgeWeight = baseDodgeWeight + (dodgeIntel * 0.05);
+                        moveAngle = blendAngles(moveAngle, dodgeResult.angle, dodgeWeight);
+                        speedMult = Math.max(speedMult, dodgeResult.strength * (0.7 + intelligence * 0.1));
+                        
+                        // Visual feedback for dodge (occasional spark)
+                        if (Math.random() < 0.1) {
+                            particles.push({
+                                x: e.x + (Math.random() - 0.5) * 20,
+                                y: e.y + (Math.random() - 0.5) * 20,
+                                vx: Math.cos(dodgeResult.angle) * 2,
+                                vy: Math.sin(dodgeResult.angle) * 2,
+                                life: 10,
+                                color: '#fbbf24',
+                                size: 2
+                            });
+                        }
                     }
                 }
             }
@@ -3847,9 +4206,9 @@ function updateEnemies(dt) {
                         speedMult = 1.05;
                     }
                 } // End of else block for normal queue behavior
-            } else if (!usingCover) {
-                // NO PATROL - Always approach player with surround tactics
-                // IMPROVED: More aggressive sector-based positioning to prevent clustering
+            } else if (!usingCover && !isPatrolling) {
+                // ALERTED MODE - Aggressive approach with surround tactics
+                // Only executes when enemy is alerted (not patrolling)
                 
                 // Check if player is stationary - trigger aggressive encirclement
                 const playerStationary = isPlayerStationary();
@@ -3978,8 +4337,18 @@ function updateEnemies(dt) {
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
             
-            // Higher smoothing factor = smoother but slower response
-            const smoothingFactor = 0.15; // Lower = smoother movement
+            // IMPROVED: Tier-based smoothing - higher tier = smoother, more predictable movement
+            // Lower smoothing factor = smoother movement but slower response
+            // Tier 0-2: 0.18 (more responsive, slightly less smooth)
+            // Tier 3-5: 0.12 (balanced)
+            // Tier 6+: 0.08 (very smooth, strategic movement)
+            let smoothingFactor = 0.18;
+            if (intelligence >= 5) {
+                smoothingFactor = 0.08; // Very smooth for highest tiers
+            } else if (intelligence >= 3) {
+                smoothingFactor = 0.12; // Balanced for mid tiers
+            }
+            
             e.smoothedMoveAngle += angleDiff * smoothingFactor;
             
             // Normalize smoothed angle
@@ -3991,7 +4360,18 @@ function updateEnemies(dt) {
             while (diffMove > Math.PI) diffMove -= Math.PI * 2;
             
             // Adaptive turn speed based on angle difference and intelligence
-            let baseTurnSpeed = (e.id >= 3 ? 0.12 : 0.06) + (intelligence * 0.015); // Reduced base turn speed
+            // IMPROVED: Lower base turn speed for higher tiers = more stable, less erratic
+            // Tier 0-2: Higher turn speed (0.06-0.09) for quicker but acceptable response
+            // Tier 3-5: Medium turn speed (0.05-0.075) for stable tactical movement
+            // Tier 6+: Lower turn speed (0.04-0.06) for smooth strategic movement
+            let baseTurnSpeed;
+            if (intelligence >= 6) {
+                baseTurnSpeed = 0.04 + (intelligence * 0.01); // Very smooth turning
+            } else if (intelligence >= 3) {
+                baseTurnSpeed = 0.05 + (intelligence * 0.012); // Balanced turning
+            } else {
+                baseTurnSpeed = 0.06 + (intelligence * 0.015); // Quick but controlled
+            }
             let adaptiveTurnSpeed = baseTurnSpeed;
             
             // FORCE CHASE: Override turn speed when in force chase mode
@@ -4084,7 +4464,16 @@ function updateEnemies(dt) {
             
             // Frozen enemies cannot fire - complete immobilization (same as player frozen effect)
             const isFrozen = e.frozenTime && e.frozenTime > 0;
-            if (e.cooldown <= 0 && hasLOS && (isAggro || d < 400) && !(e.stunnedTime && e.stunnedTime > 0) && !isFrozen && canFireAtDistance) {
+            
+            // Decrement alert shoot delay - enemy needs time to aim after being alerted
+            if (e.alertShootDelay && e.alertShootDelay > 0) {
+                e.alertShootDelay -= dt;
+            }
+            const canShootAfterAlert = !e.alertShootDelay || e.alertShootDelay <= 0;
+            
+            // Patrol mode enemies cannot shoot - they're unaware of player
+            const canEngagePlayer = (e.aiState !== 'patrol') && (isAggro || d < 400);
+            if (e.cooldown <= 0 && hasLOS && canEngagePlayer && canShootAfterAlert && !(e.stunnedTime && e.stunnedTime > 0) && !isFrozen && canFireAtDistance) {
                 // Double-check LOS before firing to prevent shooting through obstacles
                 const finalLOS = checkLineOfSight(e.x, e.y, targetX, targetY);
                 
@@ -9300,13 +9689,34 @@ function createBulletDespawnEffect(x, y, bulletType, color) {
 }
 
 // Crates always reward the player to motivate environmental destruction.
+// FIXED: Crates only drop consumables (HP, energy, shield, armor) - NO weapons
 function destroyCrate(c, index) {
     createExplosion(c.x + c.w / 2, c.y + c.h / 2, '#d97706');
-    spawnDrop(c.x + c.w / 2, c.y + c.h / 2, true);
+    spawnCrateDrop(c.x + c.w / 2, c.y + c.h / 2); // Use crate-specific drop function
     score += 25;
     addFloatText('+25', c.x + c.w / 2, c.y + c.h / 2, '#fbbf24');
     crates.splice(index, 1);
     markSpatialGridDirty(); // Rebuild spatial grid after crate destruction
+}
+
+// Crate-specific drop function - only consumables, NO weapons
+function spawnCrateDrop(x, y) {
+    const consumables = [
+        { id: 'hp', t: 'HEALTH REPAIR', short: 'HP', c: '#22c55e', rarity: 1 },
+        { id: 'en', t: 'ENERGY CHARGE', short: 'EN', c: '#06b6d4', rarity: 1 },
+        { id: 'shield', t: 'SHIELD GUARD', short: 'SH', c: '#3b82f6', rarity: 1 },
+        { id: 'armor', t: 'ARMOR PLATING', short: 'AR', c: '#78716c', rarity: 1 }
+    ];
+    
+    // Weighted selection - HP and Energy more common
+    const roll = Math.random();
+    let type;
+    if (roll < 0.35) type = consumables[0];      // HP 35%
+    else if (roll < 0.65) type = consumables[1]; // Energy 30%
+    else if (roll < 0.85) type = consumables[2]; // Shield 20%
+    else type = consumables[3];                   // Armor 15%
+    
+    pickups.push({ x, y, type: { ...type }, life: 1000, floatY: 0 });
 }
 
 function killEnemy(index) {
@@ -9734,6 +10144,11 @@ function showVictoryScreen() {
     document.getElementById('ui-layer').classList.remove('active');
     document.getElementById('pause-screen').classList.add('hidden');
     document.getElementById('gameover-screen').classList.add('hidden');
+    
+    // Play victory music
+    if (typeof MusicManager !== 'undefined') {
+        MusicManager.play('victory');
+    }
     
     // Show victory screen with dramatic entrance
     const victoryScreen = document.getElementById('victory-screen');

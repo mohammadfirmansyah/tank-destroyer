@@ -5,6 +5,119 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2025-12-02
+
+### Added
+- 🎵 **Background Music System** - Immersive audio experience with Army Men RTS OST
+  - **Tracks**: 7 unique tracks for different game states (opening, home, achievement, game, pause, failed, victory)
+  - **Fade Effects**: Smooth fade-in/fade-out transitions between tracks (800ms)
+  - **Streaming**: Audio files loaded on-demand for better performance
+  - **Persistence**: Music preference saved to localStorage
+  - **Toggle Button**: Music on/off toggle on homepage with mute icon (🔊/🔇)
+  - **Save/Resume**: Game music position saved when pausing or quitting
+  - **Browser Policy**: Handles autoplay restrictions gracefully with queued playback
+
+- 🤖 **Patrol/Alert AI State System** - Strategic enemy behavior
+  - **Patrol Mode**: Enemies spawn in patrol state with 25% speed, unaware of player
+  - **Alert Triggers**: Enemies become alerted when:
+    - Turret vision spots player (400px range, 45° cone)
+    - Enemy takes damage from player
+    - 50% or more enemies destroyed (global alert)
+  - **Alert Indicator**: Animated "!" above enemy status bar when alerted
+  - **Shoot Delay**: 1 second delay before enemy can fire after being alerted
+  - **Smart Scanning**: Turret scans open corridors/roads during patrol
+  - **Info Sharing**: Nearby enemies (180px) alerted when ally spots player
+
+- ⚠️ **Off-Screen Bullet Warning Indicator** - Visual alert for incoming enemy bullets
+  - **Feature**: Animated "!" indicators appear at screen edges when enemy bullets approach from off-screen
+  - **Animation**: Pulsing effect with 50% base opacity for non-intrusive alerts
+  - **Direction Arrows**: Small directional arrows show bullet approach direction
+  - **Color**: Red warning color with glow effect, urgency increases as bullet gets closer
+  - **Smart Deduplication**: Nearby warnings are combined to prevent visual clutter
+  - **Performance**: Limited to 8 concurrent warnings maximum
+
+- 📐 **Reference Resolution System** - Consistent world view across all devices
+  - **Portrait Mode**: 1040px reference height for vertical screens
+  - **Landscape Mode**: 480px reference height for horizontal screens
+  - **Zoom Behavior**: 
+    - Screens larger than reference = zoom in (closer view of battlefield)
+    - Screens smaller than reference = zoom out (wider view of battlefield)
+  - **Implementation**: Canvas buffer uses reference resolution, CSS stretches to fill screen
+  - **Consistency**: Same visual experience on phones, tablets, and desktops
+
+- 📊 **Deferred Status Bar Rendering System** - Status bars render above fog of war
+  - **Queue System**: `queueStatusBar()` collects status bars during entity rendering
+  - **Batch Render**: `renderDeferredStatusBars()` draws all bars after fog layer
+  - **Z-Order**: Status bars now always appear above fog of war effects
+  - **Smooth Rendering**: Uses `imageSmoothingEnabled` for anti-aliased appearance
+
+### Fixed
+- 🎯 **Crosshair Cursor Not Hiding in Demo Mode**
+  - **Bug**: Target cursor (crosshair) remained visible during demo screen
+  - **Fix**: Added `demoActive` check in `drawDesktopCrosshair()` function
+  - **Result**: Crosshair now properly hidden when viewing demo/title screen
+
+- 🎨 **Inconsistent Crosshair Color**
+  - **Bug**: Crosshair color changed based on weapon type
+  - **Fix**: Removed weapon-based color logic, crosshair now always uses military red
+  - **Result**: Consistent `rgba(255, 80, 80, 0.9)` color regardless of weapon
+
+- 🔳 **Status Bar Blocky Effect** - Smooth rendering for tank status bars
+  - **Bug**: Status bars above tanks appeared blocky due to CSS `image-rendering: pixelated`
+  - **Fix**: Added `imageSmoothingEnabled = true` and `imageSmoothingQuality = 'high'` for status bar rendering
+  - **Affected Elements**: All entity status bars (player, enemy, clone, boss)
+  - **Result**: Smooth, anti-aliased status bars while maintaining blocky terrain aesthetic
+
+- 📏 **Status Bar Scaling During Resolution Changes** - Consistent size at all resolutions
+  - **Bug**: Status bars scaled incorrectly during resolution scaling (appeared larger at lower resolutions)
+  - **Fix**: Implemented inverse scaling system to compensate for CTX.scale()
+
+- 🗺️ **Minimap Smooth Rendering**
+  - **Bug**: Minimap appeared blocky like game canvas
+  - **Fix**: Enabled `imageSmoothingEnabled = true` and `imageSmoothingQuality = 'high'` on minimap context
+  - **Result**: Clean, smooth minimap rendering
+
+- 🖱️ **Mouse to World Coordinate Conversion**
+  - **Bug**: Mouse aiming incorrect with reference resolution system
+  - **Fix**: Updated coordinate conversion to use buffer dimensions vs screen dimensions
+  - **Formula**: `worldPos = camera + screenPos * (bufferSize / screenSize)`
+
+- 🎯 **Turret Not Following Cursor**
+  - **Bug**: Turret only rotated when mouse button pressed
+  - **Fix**: Added turret tracking when `mouseAim.active` even without clicking
+  - **Result**: Turret always follows cursor for better aiming feedback
+
+### Improved
+- 🤖 **Enemy AI Movement** - Smoother, more realistic tank movement
+  - **Tier-based Smoothing**: Higher tier enemies have smoother movement (0.08-0.18 smoothing factor)
+  - **Tier-based Turn Speed**: Higher tier enemies turn slower but more strategically
+  - **All Enemies Dodge**: All tiers can now dodge bullets (lower tier = weaker/slower dodge)
+  - **Demo Player AI**: Wall avoidance system for demo player
+
+- 🌫️ **Fog of War Performance** - Respects `smoothPerfValues.fogQuality`
+  - **Quality Scaling**: Fog layers skip rendering when quality < threshold
+  - **Layer 1**: Always renders (basic fog)
+  - **Layer 2-8**: Progressive quality requirements (0.3-0.7)
+  - **Result**: Better FPS on lower-end devices
+
+- 📦 **Crate Drop System**
+  - **Change**: Crates now only drop consumables (HP, Energy, Shield, Armor)
+  - **Reason**: Weapons should only come from enemy kills
+  - **Drop Rates**: HP 35%, Energy 30%, Shield 20%, Armor 15%
+
+- 🏗️ **Wall/Crate HP Scaling**
+  - **Crates**: Base HP 50, exponential scaling (1.5^wave)
+  - **Walls**: Base HP 800, aggressive scaling with wave bonus
+  - **Result**: Very easy early game, challenging late game
+
+- 🎖️ **Wave System**
+  - **Starting Enemies**: 10 per wave (was 15)
+  - **Scaling**: +2 per wave (10 at wave 1, 30 at wave 11)
+  - **Spawn Distance**: Enemies spawn 1000-2500px from player (was 500-1500)
+  - **Separation**: Enemies spawn 350px apart minimum (was 200px)
+
+---
+
 ## [2.0.3] - 2025-12-01
 
 ### Fixed

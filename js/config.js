@@ -8,7 +8,10 @@ const RIVER_BOUNDARY = RIVER_WIDTH + 35; // Collision boundary for river (accoun
 const CANVAS = document.getElementById('gameCanvas');
 
 // Display dimensions (actual viewport size) - separate from canvas buffer size
-// These are used for camera/viewport calculations to prevent zoom when resolution scaling
+// These are used for camera/viewport calculations to ensure consistent zoom behavior
+// between game screen and demo screen across all display sizes
+// NOTE: Both gameplay.js and demo.js use displayWidth/displayHeight for camera calculations,
+// ensuring the same "zoom level" (relative tank size to screen) on any screen size
 let displayWidth = window.innerWidth;
 let displayHeight = window.innerHeight;
 
@@ -33,8 +36,9 @@ const MINI_CTX = MINI_CANVAS.getContext('2d', {
     alpha: true, 
     willReadFrequently: false
 });
-// Disable smoothing for crisp pixel-art look on minimap too
-MINI_CTX.imageSmoothingEnabled = false;
+// Enable smoothing for clean minimap rendering (not blocky)
+MINI_CTX.imageSmoothingEnabled = true;
+MINI_CTX.imageSmoothingQuality = 'high';
 const ENEMY_WALL_PADDING = 8; // Reduced to allow tanks to pass through narrow passages
 const SPAWN_WARMUP_FRAMES = 300; // 5 seconds at 60fps for dramatic spawn animation
 const WAVE_INTERMISSION_FRAMES = 300; // 5 seconds at 60fps for wave reward popup
@@ -246,7 +250,7 @@ const DEBUG_FPS_LIMITER = false;
 // Optimizations include: particle reduction, culling distance adjustment, effect simplification.
 // Useful for: Low-end devices, mobile browsers, maintaining 60 FPS target.
 // Default: true (Smart Performance enabled)
-const DEBUG_SMART_PERFORMANCE = true;
+const DEBUG_SMART_PERFORMANCE = false;
 
 // =============================================================================
 // SMART PERFORMANCE OPTIMIZER SYSTEM - COMPREHENSIVE BOTTLENECK DETECTION
@@ -1155,10 +1159,10 @@ const FINAL_ENEMY_TIER = ENEMY_TIERS.length - 1;
 // Wave-based spawning with progressive difficulty
 let currentWave = 1;
 let enemiesKilledThisWave = 0;
-let enemiesPerWave = 15; // Enemies to kill before wave complete
+let enemiesPerWave = 10; // Starting enemies to kill before wave complete
 let waveTransition = false;
 let waveTransitionTimer = 0;
-const MAX_ENEMIES_ON_MAP = 15; // Maximum enemies alive at once
+const MAX_ENEMIES_ON_MAP = 15; // Maximum enemies alive at once (spawn cap)
 const FINAL_WAVE = 12;
 const FINAL_WAVE_ESCORT_CAP = 5; // Only 5 escorts in final wave
 const FINAL_WAVE_ESCORT_SPAWN = 5; // Spawn all 5 at once around boss
@@ -1167,9 +1171,13 @@ const FINAL_WAVE_ESCORT_INITIAL_DELAY = 60;
 let finalWaveTriggered = false;
 let finalWaveEscortTimer = 0;
 
+// Calculate enemies per wave - progressive scaling
+// Wave 1: 10 enemies, Wave 11: 30 enemies (linear increase)
+// MAX_ENEMIES_ON_MAP (15) limits how many can be alive at once
 function getBaseEnemiesPerWave(waveNumber = 1) {
     const wave = Math.max(1, Math.floor(waveNumber));
-    return 15 + Math.max(0, (wave - 1) * 2);
+    // Formula: 10 at wave 1, +2 per wave = 30 at wave 11
+    return 10 + Math.max(0, (wave - 1) * 2);
 }
 
 // --- PLAYER ---

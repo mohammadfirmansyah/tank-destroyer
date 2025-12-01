@@ -49,9 +49,22 @@ function startDemo() {
     demoAreaOffsetX = margin + Math.random() * (WORLD_W - DEMO_AREA_SIZE - margin * 2);
     demoAreaOffsetY = margin + Math.random() * (WORLD_H - DEMO_AREA_SIZE - margin * 2);
     
-    // Use main game canvas - store display dimensions
-    displayWidth = window.innerWidth;
-    displayHeight = window.innerHeight;
+    // Get actual screen dimensions
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Determine orientation and reference resolution
+    const isLandscape = screenWidth > screenHeight;
+    const referenceHeight = isLandscape ? 480 : 1040;  // Match world.js reference resolution
+    const aspectRatio = screenWidth / screenHeight;
+    
+    // Calculate buffer dimensions using reference resolution
+    const bufferHeight = referenceHeight;
+    const bufferWidth = Math.round(referenceHeight * aspectRatio);
+    
+    // Store display dimensions globally (use reference-based buffer dimensions)
+    displayWidth = bufferWidth;
+    displayHeight = bufferHeight;
     
     // Check if resolution scaling is enabled via debug flag
     const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
@@ -60,10 +73,14 @@ function startDemo() {
     const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
         ? currentResolutionScale 
         : 1.0;
-    CANVAS.width = Math.floor(displayWidth * resScale);
-    CANVAS.height = Math.floor(displayHeight * resScale);
-    CANVAS.style.width = displayWidth + 'px';
-    CANVAS.style.height = displayHeight + 'px';
+    
+    // Set canvas buffer to reference resolution (with optional resolution scale)
+    CANVAS.width = Math.floor(bufferWidth * resScale);
+    CANVAS.height = Math.floor(bufferHeight * resScale);
+    
+    // Stretch canvas to fill actual screen (creates zoom effect)
+    CANVAS.style.width = screenWidth + 'px';
+    CANVAS.style.height = screenHeight + 'px';
     
     // === MOBILE GPU-SAFE DEMO INITIALIZATION ===
     // Step 1: Reset canvas context state (prevents GPU state corruption on mobile)
@@ -991,35 +1008,81 @@ function updateDemoPlayerAI() {
             ai.strafeDir = Math.random() > 0.5 ? 1 : -1;
         }
         
-        // Calculate movement
-        let moveX = 0;
-        let moveY = 0;
+        // Calculate base movement angle
+        let moveAngle = targetAngle;
         
         // DEMO: Tighter approach/retreat thresholds for closer combat
         if (dist > optimalDist + 50) {
-            // Move closer
-            moveX = Math.cos(targetAngle) * playerSpeed;
-            moveY = Math.sin(targetAngle) * playerSpeed;
+            // Move closer to target
+            moveAngle = targetAngle;
         } else if (dist < optimalDist - 50) {
-            // Move away
-            moveX = -Math.cos(targetAngle) * playerSpeed * 0.7;
-            moveY = -Math.sin(targetAngle) * playerSpeed * 0.7;
+            // Move away from target
+            moveAngle = targetAngle + Math.PI;
+        } else {
+            // At optimal distance - strafe
+            moveAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
         }
         
-        // Add strafing
-        const strafeAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
-        moveX += Math.cos(strafeAngle) * playerSpeed * 0.5;
-        moveY += Math.sin(strafeAngle) * playerSpeed * 0.5;
+        // === WALL/OBSTACLE AVOIDANCE (uses same system as enemy AI) ===
+        // Check if desired movement direction is blocked
+        if (typeof pathBlocked === 'function' && typeof findAvoidanceAngle === 'function') {
+            // Use game's avoidance system for consistent behavior
+            const avoidanceOffset = findAvoidanceAngle(player, moveAngle);
+            moveAngle += avoidanceOffset;
+        } else {
+            // Fallback: Simple obstacle detection and avoidance
+            const checkDist = 80;
+            const checkX = player.x + Math.cos(moveAngle) * checkDist;
+            const checkY = player.y + Math.sin(moveAngle) * checkDist;
+            
+            if (checkDemoWallCollision(checkX, checkY, player.radius || 25)) {
+                // Path blocked - try alternative directions
+                const alternatives = [
+                    moveAngle + Math.PI / 4,
+                    moveAngle - Math.PI / 4,
+                    moveAngle + Math.PI / 2,
+                    moveAngle - Math.PI / 2,
+                    moveAngle + Math.PI * 0.75,
+                    moveAngle - Math.PI * 0.75
+                ];
+                
+                for (const altAngle of alternatives) {
+                    const altX = player.x + Math.cos(altAngle) * checkDist;
+                    const altY = player.y + Math.sin(altAngle) * checkDist;
+                    if (!checkDemoWallCollision(altX, altY, player.radius || 25)) {
+                        moveAngle = altAngle;
+                        break;
+                    }
+                }
+            }
+        }
         
-        // Apply movement with wall collision check
+        // Calculate final movement vector
+        let moveX = Math.cos(moveAngle) * playerSpeed;
+        let moveY = Math.sin(moveAngle) * playerSpeed;
+        
+        // Add slight strafing component for variety (reduced when avoiding obstacles)
+        const strafeAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
+        const avoidingObstacle = (player.obstacleLock && player.obstacleLock.ttl > 0);
+        const strafeWeight = avoidingObstacle ? 0.1 : 0.3;
+        moveX += Math.cos(strafeAngle) * playerSpeed * strafeWeight;
+        moveY += Math.sin(strafeAngle) * playerSpeed * strafeWeight;
+        
+        // Apply movement with collision check (final safety net)
         const newX = player.x + moveX * demoDt;
         const newY = player.y + moveY * demoDt;
         
-        if (!checkDemoWallCollision(newX, player.y, player.radius || 25)) {
-            player.x = newX;
-        }
-        if (!checkDemoWallCollision(player.x, newY, player.radius || 25)) {
-            player.y = newY;
+        // Use game's movement function if available for consistent behavior
+        if (typeof moveEnemyWithAvoidance === 'function') {
+            moveEnemyWithAvoidance(player, Math.atan2(moveY, moveX), playerSpeed, demoDt);
+        } else {
+            // Fallback: Simple axis-separated collision
+            if (!checkDemoWallCollision(newX, player.y, player.radius || 25)) {
+                player.x = newX;
+            }
+            if (!checkDemoWallCollision(player.x, newY, player.radius || 25)) {
+                player.y = newY;
+            }
         }
         
         // Clamp to demo area bounds
@@ -1027,9 +1090,11 @@ function updateDemoPlayerAI() {
         player.y = Math.max(demoAreaOffsetY + 50, Math.min(demoAreaOffsetY + DEMO_AREA_SIZE - 50, player.y));
         
         // Update body angle towards movement direction
-        if (Math.abs(moveX) > 0.1 || Math.abs(moveY) > 0.1) {
-            const moveAngle = Math.atan2(moveY, moveX);
-            let bodyDiff = moveAngle - player.angle;
+        const actualMoveX = moveX;
+        const actualMoveY = moveY;
+        if (Math.abs(actualMoveX) > 0.1 || Math.abs(actualMoveY) > 0.1) {
+            const bodyMoveAngle = Math.atan2(actualMoveY, actualMoveX);
+            let bodyDiff = bodyMoveAngle - player.angle;
             while (bodyDiff > Math.PI) bodyDiff -= Math.PI * 2;
             while (bodyDiff < -Math.PI) bodyDiff += Math.PI * 2;
             player.angle += bodyDiff * 0.08 * demoDt;
@@ -2139,7 +2204,16 @@ function drawDemo() {
 }
 
 // Draw demo title overlay - fog of war effect for cinematic main menu
+// Respects smoothPerfValues.fogQuality for performance scaling
 function drawDemoOverlay() {
+    // Get fog quality setting (0.0 to 1.0, default 1.0)
+    const fogQuality = (typeof smoothPerfValues !== 'undefined' && smoothPerfValues.fogQuality !== undefined) 
+        ? smoothPerfValues.fogQuality 
+        : 1.0;
+    
+    // Skip fog entirely if quality is below threshold
+    if (fogQuality < 0.05) return;
+    
     // Use display dimensions for overlay (consistent regardless of resolution scale)
     const w = (typeof displayWidth !== 'undefined') ? displayWidth : CANVAS.width;
     const h = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
@@ -2164,65 +2238,77 @@ function drawDemoOverlay() {
     }
     
     // === LAYER 1: Base fog coverage - entire screen with uniform density ===
-    CTX.globalAlpha = 0.15;
+    // Always rendered (basic fog layer)
+    CTX.globalAlpha = 0.15 * fogQuality;
     CTX.fillStyle = 'rgb(12, 18, 32)';
     CTX.fillRect(0, 0, w, h);
     
     // === LAYER 2: Animated fog wisps - flowing across screen ===
-    const fogLayers = [
-        { speed: 0.0004, scale: 0.9, alpha: 0.1, yOffset: 0 },
-        { speed: 0.0006, scale: 1.3, alpha: 0.08, yOffset: h * 0.35 },
-        { speed: 0.0005, scale: 1.1, alpha: 0.09, yOffset: h * 0.65 }
-    ];
-    
-    fogLayers.forEach((fog, index) => {
-        const xOffset = (time * fog.speed * w) % (w * 2) - w * 0.5;
-        const waveY = Math.sin(time * 0.007 + index) * 25;
+    // Only render if fogQuality > 0.5 (medium+ quality)
+    if (fogQuality > 0.5) {
+        const fogLayerCount = fogQuality > 0.8 ? 3 : 2;
+        const fogLayers = [
+            { speed: 0.0004, scale: 0.9, alpha: 0.1, yOffset: 0 },
+            { speed: 0.0006, scale: 1.3, alpha: 0.08, yOffset: h * 0.35 },
+            { speed: 0.0005, scale: 1.1, alpha: 0.09, yOffset: h * 0.65 }
+        ];
         
-        const fogGrad = CTX.createLinearGradient(
-            xOffset, fog.yOffset + waveY,
-            xOffset + w * fog.scale, fog.yOffset + h * 0.45 + waveY
-        );
-        fogGrad.addColorStop(0, 'rgba(18, 22, 38, 0)');
-        fogGrad.addColorStop(0.3, `rgba(22, 28, 48, ${fog.alpha})`);
-        fogGrad.addColorStop(0.5, `rgba(28, 35, 55, ${fog.alpha * 1.3})`);
-        fogGrad.addColorStop(0.7, `rgba(22, 28, 48, ${fog.alpha})`);
-        fogGrad.addColorStop(1, 'rgba(18, 22, 38, 0)');
-        
-        CTX.globalAlpha = 1;
-        CTX.fillStyle = fogGrad;
-        CTX.fillRect(0, 0, w, h);
-    });
+        for (let i = 0; i < fogLayerCount; i++) {
+            const fog = fogLayers[i];
+            const xOffset = (time * fog.speed * w) % (w * 2) - w * 0.5;
+            const waveY = Math.sin(time * 0.007 + i) * 25;
+            
+            const fogGrad = CTX.createLinearGradient(
+                xOffset, fog.yOffset + waveY,
+                xOffset + w * fog.scale, fog.yOffset + h * 0.45 + waveY
+            );
+            fogGrad.addColorStop(0, 'rgba(18, 22, 38, 0)');
+            fogGrad.addColorStop(0.3, `rgba(22, 28, 48, ${fog.alpha * fogQuality})`);
+            fogGrad.addColorStop(0.5, `rgba(28, 35, 55, ${fog.alpha * 1.3 * fogQuality})`);
+            fogGrad.addColorStop(0.7, `rgba(22, 28, 48, ${fog.alpha * fogQuality})`);
+            fogGrad.addColorStop(1, 'rgba(18, 22, 38, 0)');
+            
+            CTX.globalAlpha = 1;
+            CTX.fillStyle = fogGrad;
+            CTX.fillRect(0, 0, w, h);
+        }
+    }
     
     // === LAYER 3: Fog density clouds - scattered across screen ===
-    const cloudCount = isLandscape ? 10 : 7;
-    for (let i = 0; i < cloudCount; i++) {
-        const cloudX = (w * (i / cloudCount) + Math.sin(time * 0.004 + i * 2.2) * w * 0.12) % w;
-        const cloudY = (h * ((i * 0.618) % 1) + Math.cos(time * 0.003 + i) * h * 0.1);
-        const cloudSize = baseSize * (0.22 + Math.sin(time * 0.0025 + i * 1.3) * 0.06);
-        const cloudAlpha = 0.05 + Math.sin(time * 0.005 + i * 0.7) * 0.025;
-        
-        const cloudGrad = CTX.createRadialGradient(
-            cloudX, cloudY, 0,
-            cloudX, cloudY, cloudSize
-        );
-        cloudGrad.addColorStop(0, `rgba(22, 32, 52, ${cloudAlpha})`);
-        cloudGrad.addColorStop(0.4, `rgba(18, 28, 48, ${cloudAlpha * 0.65})`);
-        cloudGrad.addColorStop(0.7, `rgba(14, 22, 42, ${cloudAlpha * 0.35})`);
-        cloudGrad.addColorStop(1, 'rgba(14, 22, 42, 0)');
-        
-        CTX.fillStyle = cloudGrad;
-        CTX.fillRect(0, 0, w, h);
+    // Only render if fogQuality > 0.6 (high quality)
+    if (fogQuality > 0.6) {
+        const baseCloudCount = isLandscape ? 10 : 7;
+        const cloudCount = Math.max(2, Math.round(baseCloudCount * fogQuality));
+        for (let i = 0; i < cloudCount; i++) {
+            const cloudX = (w * (i / cloudCount) + Math.sin(time * 0.004 + i * 2.2) * w * 0.12) % w;
+            const cloudY = (h * ((i * 0.618) % 1) + Math.cos(time * 0.003 + i) * h * 0.1);
+            const cloudSize = baseSize * (0.22 + Math.sin(time * 0.0025 + i * 1.3) * 0.06);
+            const cloudAlpha = (0.05 + Math.sin(time * 0.005 + i * 0.7) * 0.025) * fogQuality;
+            
+            const cloudGrad = CTX.createRadialGradient(
+                cloudX, cloudY, 0,
+                cloudX, cloudY, cloudSize
+            );
+            cloudGrad.addColorStop(0, `rgba(22, 32, 52, ${cloudAlpha})`);
+            cloudGrad.addColorStop(0.4, `rgba(18, 28, 48, ${cloudAlpha * 0.65})`);
+            cloudGrad.addColorStop(0.7, `rgba(14, 22, 42, ${cloudAlpha * 0.35})`);
+            cloudGrad.addColorStop(1, 'rgba(14, 22, 42, 0)');
+            
+            CTX.fillStyle = cloudGrad;
+            CTX.fillRect(0, 0, w, h);
+        }
     }
     
     // === LAYER 4: Edge darkening with rounded corners ===
+    // Always rendered (core vignette effect)
     const edgeSize = baseSize * 0.28;
     const cornerRadius = baseSize * 0.18;
+    const edgeAlphaScale = Math.max(0.5, fogQuality);
     
     // Top edge fog
     const topGrad = CTX.createLinearGradient(0, 0, 0, edgeSize);
-    topGrad.addColorStop(0, 'rgba(8, 12, 28, 0.45)');
-    topGrad.addColorStop(0.5, 'rgba(8, 12, 28, 0.2)');
+    topGrad.addColorStop(0, `rgba(8, 12, 28, ${0.45 * edgeAlphaScale})`);
+    topGrad.addColorStop(0.5, `rgba(8, 12, 28, ${0.2 * edgeAlphaScale})`);
     topGrad.addColorStop(1, 'rgba(8, 12, 28, 0)');
     CTX.fillStyle = topGrad;
     CTX.fillRect(0, 0, w, edgeSize);
@@ -2230,15 +2316,15 @@ function drawDemoOverlay() {
     // Bottom edge fog
     const bottomGrad = CTX.createLinearGradient(0, h - edgeSize, 0, h);
     bottomGrad.addColorStop(0, 'rgba(8, 12, 28, 0)');
-    bottomGrad.addColorStop(0.5, 'rgba(8, 12, 28, 0.2)');
-    bottomGrad.addColorStop(1, 'rgba(8, 12, 28, 0.45)');
+    bottomGrad.addColorStop(0.5, `rgba(8, 12, 28, ${0.2 * edgeAlphaScale})`);
+    bottomGrad.addColorStop(1, `rgba(8, 12, 28, ${0.45 * edgeAlphaScale})`);
     CTX.fillStyle = bottomGrad;
     CTX.fillRect(0, h - edgeSize, w, edgeSize);
     
     // Left edge fog
     const leftGrad = CTX.createLinearGradient(0, 0, edgeSize, 0);
-    leftGrad.addColorStop(0, 'rgba(8, 12, 28, 0.45)');
-    leftGrad.addColorStop(0.5, 'rgba(8, 12, 28, 0.2)');
+    leftGrad.addColorStop(0, `rgba(8, 12, 28, ${0.45 * edgeAlphaScale})`);
+    leftGrad.addColorStop(0.5, `rgba(8, 12, 28, ${0.2 * edgeAlphaScale})`);
     leftGrad.addColorStop(1, 'rgba(8, 12, 28, 0)');
     CTX.fillStyle = leftGrad;
     CTX.fillRect(0, 0, edgeSize, h);
@@ -2246,70 +2332,85 @@ function drawDemoOverlay() {
     // Right edge fog
     const rightGrad = CTX.createLinearGradient(w - edgeSize, 0, w, 0);
     rightGrad.addColorStop(0, 'rgba(8, 12, 28, 0)');
-    rightGrad.addColorStop(0.5, 'rgba(8, 12, 28, 0.2)');
-    rightGrad.addColorStop(1, 'rgba(8, 12, 28, 0.45)');
+    rightGrad.addColorStop(0.5, `rgba(8, 12, 28, ${0.2 * edgeAlphaScale})`);
+    rightGrad.addColorStop(1, `rgba(8, 12, 28, ${0.45 * edgeAlphaScale})`);
     CTX.fillStyle = rightGrad;
     CTX.fillRect(w - edgeSize, 0, edgeSize, h);
     
     // === LAYER 5: Rounded corner fog patches ===
-    const corners = [
-        { x: 0, y: 0 },
-        { x: w, y: 0 },
-        { x: 0, y: h },
-        { x: w, y: h }
-    ];
-    
-    corners.forEach(corner => {
-        const cornerGrad = CTX.createRadialGradient(
-            corner.x, corner.y, 0,
-            corner.x, corner.y, cornerRadius * 2.2
-        );
-        cornerGrad.addColorStop(0, 'rgba(6, 10, 22, 0.5)');
-        cornerGrad.addColorStop(0.4, 'rgba(8, 12, 28, 0.3)');
-        cornerGrad.addColorStop(0.7, 'rgba(10, 15, 32, 0.12)');
-        cornerGrad.addColorStop(1, 'rgba(12, 18, 35, 0)');
+    // Only render if fogQuality > 0.3
+    if (fogQuality > 0.3) {
+        const cornerAlpha = fogQuality;
+        const corners = [
+            { x: 0, y: 0 },
+            { x: w, y: 0 },
+            { x: 0, y: h },
+            { x: w, y: h }
+        ];
         
-        CTX.fillStyle = cornerGrad;
-        CTX.fillRect(0, 0, w, h);
-    });
+        corners.forEach(corner => {
+            const cornerGrad = CTX.createRadialGradient(
+                corner.x, corner.y, 0,
+                corner.x, corner.y, cornerRadius * 2.2
+            );
+            cornerGrad.addColorStop(0, `rgba(6, 10, 22, ${0.5 * cornerAlpha})`);
+            cornerGrad.addColorStop(0.4, `rgba(8, 12, 28, ${0.3 * cornerAlpha})`);
+            cornerGrad.addColorStop(0.7, `rgba(10, 15, 32, ${0.12 * cornerAlpha})`);
+            cornerGrad.addColorStop(1, 'rgba(12, 18, 35, 0)');
+            
+            CTX.fillStyle = cornerGrad;
+            CTX.fillRect(0, 0, w, h);
+        });
+    }
     
     // === LAYER 6: Subtle pulsing atmosphere ===
-    const pulseAlpha = 0.025 + Math.sin(time * 0.012) * 0.018;
-    CTX.globalAlpha = pulseAlpha;
-    CTX.fillStyle = 'rgb(18, 22, 42)';
-    CTX.fillRect(0, 0, w, h);
+    // Only render if fogQuality > 0.4
+    if (fogQuality > 0.4) {
+        const pulseAlpha = (0.025 + Math.sin(time * 0.012) * 0.018) * fogQuality;
+        CTX.globalAlpha = pulseAlpha;
+        CTX.fillStyle = 'rgb(18, 22, 42)';
+        CTX.fillRect(0, 0, w, h);
+    }
     
     // === LAYER 7: Particle dust motes ===
+    // Only render if fogQuality > 0.7
     CTX.globalAlpha = 1;
-    const particleCount = isLandscape ? 18 : 12;
-    for (let i = 0; i < particleCount; i++) {
-        const px = (w * ((i * 0.73 + time * 0.00004 * (i + 1)) % 1));
-        const py = (h * ((i * 0.41 + Math.sin(time * 0.006 + i) * 0.12) % 1));
-        const pSize = 1.2 + Math.sin(time * 0.008 + i * 2) * 0.6;
-        const pAlpha = 0.18 + Math.sin(time * 0.01 + i * 1.3) * 0.12;
-        
-        CTX.beginPath();
-        CTX.arc(px, py, pSize, 0, Math.PI * 2);
-        CTX.fillStyle = `rgba(170, 185, 205, ${pAlpha})`;
-        CTX.fill();
+    if (fogQuality > 0.7) {
+        const baseParticleCount = isLandscape ? 18 : 12;
+        const particleCount = Math.max(3, Math.round(baseParticleCount * fogQuality));
+        for (let i = 0; i < particleCount; i++) {
+            const px = (w * ((i * 0.73 + time * 0.00004 * (i + 1)) % 1));
+            const py = (h * ((i * 0.41 + Math.sin(time * 0.006 + i) * 0.12) % 1));
+            const pSize = 1.2 + Math.sin(time * 0.008 + i * 2) * 0.6;
+            const pAlpha = (0.18 + Math.sin(time * 0.01 + i * 1.3) * 0.12) * fogQuality;
+            
+            CTX.beginPath();
+            CTX.arc(px, py, pSize, 0, Math.PI * 2);
+            CTX.fillStyle = `rgba(170, 185, 205, ${pAlpha})`;
+            CTX.fill();
+        }
     }
     
     // === LAYER 8: Central visibility zone ===
-    const centerX = w / 2;
-    const centerY = h / 2;
-    const clearRadius = baseSize * 0.32;
-    
-    const clearGrad = CTX.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, clearRadius
-    );
-    clearGrad.addColorStop(0, 'rgba(255, 255, 248, 0.04)');
-    clearGrad.addColorStop(0.4, 'rgba(255, 255, 248, 0.02)');
-    clearGrad.addColorStop(0.7, 'rgba(255, 255, 248, 0.008)');
-    clearGrad.addColorStop(1, 'rgba(255, 255, 248, 0)');
-    
-    CTX.fillStyle = clearGrad;
-    CTX.fillRect(0, 0, w, h);
+    // Only render if fogQuality > 0.5
+    if (fogQuality > 0.5) {
+        const centerX = w / 2;
+        const centerY = h / 2;
+        const clearRadius = baseSize * 0.32;
+        const clearAlpha = fogQuality;
+        
+        const clearGrad = CTX.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, clearRadius
+        );
+        clearGrad.addColorStop(0, `rgba(255, 255, 248, ${0.04 * clearAlpha})`);
+        clearGrad.addColorStop(0.4, `rgba(255, 255, 248, ${0.02 * clearAlpha})`);
+        clearGrad.addColorStop(0.7, `rgba(255, 255, 248, ${0.008 * clearAlpha})`);
+        clearGrad.addColorStop(1, 'rgba(255, 255, 248, 0)');
+        
+        CTX.fillStyle = clearGrad;
+        CTX.fillRect(0, 0, w, h);
+    }
     
     CTX.restore();
 }
@@ -2317,9 +2418,22 @@ function drawDemoOverlay() {
 // Resize handler
 window.addEventListener('resize', () => {
     if (demoActive) {
-        // Update display dimensions
-        displayWidth = window.innerWidth;
-        displayHeight = window.innerHeight;
+        // Get actual screen dimensions
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        
+        // Determine orientation and reference resolution
+        const isLandscape = screenWidth > screenHeight;
+        const referenceHeight = isLandscape ? 480 : 1040;  // Match world.js reference resolution
+        const aspectRatio = screenWidth / screenHeight;
+        
+        // Calculate buffer dimensions using reference resolution
+        const bufferHeight = referenceHeight;
+        const bufferWidth = Math.round(referenceHeight * aspectRatio);
+        
+        // Store display dimensions globally (use reference-based buffer dimensions)
+        displayWidth = bufferWidth;
+        displayHeight = bufferHeight;
         
         // Check if resolution scaling is enabled via debug flag
         const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
@@ -2328,9 +2442,13 @@ window.addEventListener('resize', () => {
         const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
             ? currentResolutionScale 
             : 1.0;
-        CANVAS.width = Math.floor(displayWidth * resScale);
-        CANVAS.height = Math.floor(displayHeight * resScale);
-        CANVAS.style.width = displayWidth + 'px';
-        CANVAS.style.height = displayHeight + 'px';
+        
+        // Set canvas buffer to reference resolution (with optional resolution scale)
+        CANVAS.width = Math.floor(bufferWidth * resScale);
+        CANVAS.height = Math.floor(bufferHeight * resScale);
+        
+        // Stretch canvas to fill actual screen (creates zoom effect)
+        CANVAS.style.width = screenWidth + 'px';
+        CANVAS.style.height = screenHeight + 'px';
     }
 });

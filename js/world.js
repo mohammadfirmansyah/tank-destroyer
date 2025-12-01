@@ -2,51 +2,104 @@
 // Canvas is responsive so recalculating dimensions here keeps the arena view
 // matched to the browser window.
 
-// Mobile detection for special handling
+// Mobile detection for special handling (touch controls, etc.)
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 let isResizing = false; // Prevent multiple rapid resize calls
 let resizeTimeout = null;
 let lastWidth = 0;
 let lastHeight = 0;
 
+// =============================================================================
+// REFERENCE RESOLUTION SYSTEM
+// Uses fixed reference resolution for consistent world view across all devices
+// Portrait: 1040px height (width < height)
+// Landscape: 480px height (width > height)
+// Screens larger than reference = zoom in (closer view)
+// Screens smaller than reference = zoom out (wider view)
+// =============================================================================
+const REFERENCE_HEIGHT_PORTRAIT = 1040;  // Reference height for portrait mode
+const REFERENCE_HEIGHT_LANDSCAPE = 480;  // Reference height for landscape mode
+
+// Calculate zoom factor based on screen size vs reference resolution
+// Used by render.js for consistent status bar sizing
+function calculateReferenceZoom() {
+    const screenWidth = (typeof displayWidth !== 'undefined') ? displayWidth : window.innerWidth;
+    const screenHeight = (typeof displayHeight !== 'undefined') ? displayHeight : window.innerHeight;
+    const isLandscape = screenWidth > screenHeight;
+    
+    // Select reference height based on orientation only
+    const referenceHeight = isLandscape ? REFERENCE_HEIGHT_LANDSCAPE : REFERENCE_HEIGHT_PORTRAIT;
+    
+    // Calculate zoom factor: if screen is larger than reference, zoom in; if smaller, zoom out
+    // This ensures consistent visual proportions across all screen sizes
+    const zoomFactor = screenHeight / referenceHeight;
+    
+    return {
+        zoom: zoomFactor,
+        isLandscape: isLandscape,
+        referenceHeight: referenceHeight,
+        screenWidth: screenWidth,
+        screenHeight: screenHeight
+    };
+}
+
 // Robust resize function with mobile glitch prevention
+// Uses REFERENCE RESOLUTION for consistent visual experience
 // NOTE: Resolution scaling only applies if DEBUG_ENABLE_RESOLUTION_SCALING is true in config.js
-// Otherwise canvas always renders at native resolution
 function resize() {
     // Get actual viewport dimensions
     const newWidth = window.innerWidth;
     const newHeight = window.innerHeight;
     
+    // Determine orientation
+    const isLandscape = newWidth > newHeight;
+    
+    // Select reference height based on orientation only
+    const referenceHeight = isLandscape ? REFERENCE_HEIGHT_LANDSCAPE : REFERENCE_HEIGHT_PORTRAIT;
+    
+    // Calculate zoom factor based on screen vs reference
+    // zoom > 1 = larger screen (zoom in), zoom < 1 = smaller screen (zoom out)
+    const zoomFactor = newHeight / referenceHeight;
+    
+    // Calculate reference-based buffer dimensions
+    // Buffer uses reference height, width is calculated to match aspect ratio
+    const aspectRatio = newWidth / newHeight;
+    const bufferHeight = referenceHeight;
+    const bufferWidth = Math.round(referenceHeight * aspectRatio);
+    
     // Store display dimensions globally for camera/viewport calculations
-    // This prevents zoom effect when resolution scaling is active
-    displayWidth = newWidth;
-    displayHeight = newHeight;
+    // Camera should use buffer dimensions (reference resolution) for consistent zoom
+    // displayWidth/displayHeight represent the "virtual" viewport in world units
+    displayWidth = bufferWidth;
+    displayHeight = bufferHeight;
     
     // Check if resolution scaling is enabled via debug flag
     const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
     
     // Get current resolution scale (only applies if debug flag is enabled)
+    // This is ADDITIONAL scaling on top of reference resolution
     const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
         ? currentResolutionScale 
         : 1.0;
     
-    // Calculate buffer dimensions based on resolution scale
-    const bufferWidth = Math.floor(newWidth * resScale);
-    const bufferHeight = Math.floor(newHeight * resScale);
+    // Calculate final buffer dimensions with resolution scale applied
+    const finalBufferWidth = Math.floor(bufferWidth * resScale);
+    const finalBufferHeight = Math.floor(bufferHeight * resScale);
     
     // Skip if display dimensions haven't actually changed
-    // Check display dimensions, not buffer, to properly detect window resize
     if (newWidth === lastWidth && newHeight === lastHeight) return;
     
-    // Update tracked dimensions (use display dimensions for resize detection)
+    // Update tracked dimensions
     lastWidth = newWidth;
     lastHeight = newHeight;
     
-    // Apply dimensions to canvas internal buffer
-    CANVAS.width = bufferWidth;
-    CANVAS.height = bufferHeight;
+    // Apply dimensions to canvas internal buffer (using reference resolution)
+    CANVAS.width = finalBufferWidth;
+    CANVAS.height = finalBufferHeight;
     
-    // Apply CSS dimensions for display (upscaling if resolution scale < 1)
+    // Apply CSS dimensions for display (stretch to fill actual screen)
+    // This creates the zoom effect: reference resolution stretched to screen size
     CANVAS.style.width = newWidth + 'px';
     CANVAS.style.height = newHeight + 'px';
     
@@ -154,23 +207,33 @@ window.addEventListener('focus', () => {
 // Procedurally place walls and crates to form light cover so each run feels
 // slightly different while still respecting a protected spawn zone.
 
-// Base HP values for walls and crates
-const BASE_WALL_HP = 1200;
-const BASE_CRATE_HP = 400;
+// Base HP values for walls and crates (at wave 1)
+// Crates start weak and scale aggressively - very easy early, extremely tough late game
+const BASE_CRATE_HP = 50;   // Very low starting HP for early waves
+// Walls start moderate and scale more aggressively at later waves
+const BASE_WALL_HP = 800;   // Starting HP for walls
 
 // Scale wall and crate HP based on current wave
-// Higher waves = sturdier walls (helps create longer cover for harder fights)
+// Uses aggressive exponential curve: very easy early game, extremely tough late game
 function scaleWorldHP(wave) {
     if (!wave || wave < 1) wave = 1;
     
-    // HP multiplier: 1.0 at wave 1, increases by 15% per wave
-    // Wave 1: 100%, Wave 5: 160%, Wave 10: 235%, Wave 15: 310%
-    const hpMultiplier = 1 + (wave - 1) * 0.15;
+    // Crate HP curve: aggressive exponential growth for dramatic scaling
+    // Wave 1: 50 HP (very weak), Wave 6: ~500 HP, Wave 12: ~5000 HP
+    // Formula: base * (1.5 ^ (wave - 1)) - very aggressive scaling
+    const crateMultiplier = Math.pow(1.5, wave - 1);
+    
+    // Wall HP curve: steeper exponential for late-game durability  
+    // Wave 1: 800 HP, Wave 6: ~1600 HP, Wave 12: ~4000 HP
+    // Formula: base * (1.15 ^ (wave - 1)) * (1 + (wave - 1) * 0.05)
+    const wallBaseMultiplier = Math.pow(1.15, wave - 1);
+    const wallBonusMultiplier = 1 + (wave - 1) * 0.05;
+    const wallMultiplier = wallBaseMultiplier * wallBonusMultiplier;
     
     // Scale destructible walls
     for (const wall of walls) {
         if (wall.destructible) {
-            wall.maxHp = Math.round(BASE_WALL_HP * hpMultiplier);
+            wall.maxHp = Math.round(BASE_WALL_HP * wallMultiplier);
             // Only restore HP if wall still exists (hp > 0)
             if (wall.hp > 0) {
                 wall.hp = wall.maxHp;
@@ -180,7 +243,7 @@ function scaleWorldHP(wave) {
     
     // Scale crates
     for (const crate of crates) {
-        crate.maxHp = Math.round(BASE_CRATE_HP * hpMultiplier);
+        crate.maxHp = Math.round(BASE_CRATE_HP * crateMultiplier);
         // Only restore HP if crate still exists (hp > 0)
         if (crate.hp > 0) {
             crate.hp = crate.maxHp;
@@ -242,8 +305,9 @@ function initWorld() {
         if (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 250) overlap = true; // Larger spawn area for bigger map
 
         if (!overlap) {
-            if (isCrate) crates.push({ x: x, y: y, w: w, h: h, hp: 400, maxHp: 400, seed: Math.random() });
-            else walls.push({ x, y, w, h, destructible: true, hp: 1200, maxHp: 1200, seed: Math.random() });
+            // Use base HP values - will be scaled by scaleWorldHP() when wave starts
+            if (isCrate) crates.push({ x: x, y: y, w: w, h: h, hp: BASE_CRATE_HP, maxHp: BASE_CRATE_HP, seed: Math.random() });
+            else walls.push({ x, y, w, h, destructible: true, hp: BASE_WALL_HP, maxHp: BASE_WALL_HP, seed: Math.random() });
             count++;
         }
     }
@@ -300,9 +364,12 @@ function findSafeSpot(radius, avoidPlayer = false) {
 
 function findPlayerRingSpawn(radius) {
     if (!player || typeof player.x !== 'number') return null;
-    const innerRadius = 500;
-    const outerRadius = 1500;
-    const attempts = 80;
+    // Increased spawn distance from player - enemies spawn farther away
+    const innerRadius = 1000;  // Minimum 1000px from player (was 800)
+    const outerRadius = 2500;  // Maximum 2500px from player (was 2000)
+    // Increased inter-enemy spawn separation - enemies spawn farther apart
+    const enemySeparation = 350; // Minimum distance between spawning enemies (was 200)
+    const attempts = 150;       // More attempts for stricter constraints
     const margin = radius + 80;
     for (let i = 0; i < attempts; i++) {
         const ang = Math.random() * Math.PI * 2;
@@ -321,9 +388,10 @@ function findPlayerRingSpawn(radius) {
 
         if (!canOccupy(x, y, radius)) continue;
 
+        // Check inter-enemy separation - ensure enemies spawn far apart
         let overlap = false;
         for (let enemy of enemies) {
-            if (Math.hypot(x - enemy.x, y - enemy.y) < enemy.radius + radius + 30) {
+            if (Math.hypot(x - enemy.x, y - enemy.y) < enemySeparation) {
                 overlap = true;
                 break;
             }
@@ -566,7 +634,21 @@ function spawnEnemy(options = {}) {
         turretRecoilOffsetX: 0,
         turretRecoilOffsetY: 0,
         turretRecoilDecay: 0.70,
-        recoilRecoveryTime: 0 // Turret tracking lock after firing
+        recoilRecoveryTime: 0, // Turret tracking lock after firing
+        
+        // === PATROL/ALERT STATE SYSTEM ===
+        // Enemies spawn in patrol mode with reduced speed
+        // They become alerted when: seeing player in turret FOV, being shot, or 50% enemies killed
+        aiState: 'patrol',       // 'patrol' = slow patrol, 'alerted' = aggressive attack
+        alertedReason: null,     // Why enemy became alerted: 'vision', 'damaged', 'allies_low'
+        patrolSpeedMult: 0.25,   // Speed multiplier during patrol (25% speed - very slow)
+        visionAlertRange: 400,   // Distance at which turret vision can spot player
+        visionAlertAngle: Math.PI / 4,  // Turret must face player within 45 degrees to spot
+        
+        // === LAST KNOWN PLAYER POSITION ===
+        // Store player position at spawn time as "suspected location"
+        // Turret will prioritize scanning roads/corridors toward this direction
+        lastKnownPlayerPos: player ? { x: player.x, y: player.y } : null
     };
 
     enemies.push(enemy);

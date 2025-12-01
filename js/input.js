@@ -106,20 +106,28 @@ window.addEventListener('mousemove', e => {
     if (state !== 'GAME' || paused) return;
     setInputMode(INPUT_MODE.DESKTOP);
     
-    // Store raw screen coordinates
+    // Store raw screen coordinates for crosshair rendering
     mouseAim.screenX = e.clientX;
     mouseAim.screenY = e.clientY;
     
     // Convert screen position to world position for accurate aiming
     // Camera offset + screen position = world position
     if (typeof camX !== 'undefined' && typeof camY !== 'undefined' && typeof player !== 'undefined') {
-        // Account for resolution scaling if active
-        const resScale = (typeof currentResolutionScale !== 'undefined') ? currentResolutionScale : 1.0;
+        // Get screen (CSS) dimensions and buffer dimensions for proper coordinate conversion
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
         
-        // Screen to world conversion: world = camera + (screen * (1/resScale))
-        // At lower resolution, each screen pixel represents more world units
-        const worldMouseX = camX + (e.clientX / resScale);
-        const worldMouseY = camY + (e.clientY / resScale);
+        // displayWidth/displayHeight are the reference buffer dimensions (without resScale)
+        // They represent the virtual viewport size in world units
+        const bufferW = (typeof displayWidth !== 'undefined') ? displayWidth : screenWidth;
+        const bufferH = (typeof displayHeight !== 'undefined') ? displayHeight : screenHeight;
+        
+        // Screen to world conversion:
+        // 1. Convert screen pixels to buffer pixels: screen * (buffer/screen)
+        // 2. Buffer pixels directly map to world units (camera is in world space)
+        // Result: worldPos = camera + screenPos * (bufferSize / screenSize)
+        const worldMouseX = camX + (e.clientX * bufferW / screenWidth);
+        const worldMouseY = camY + (e.clientY * bufferH / screenHeight);
         
         // Calculate angle from player to mouse position in world space
         const dx = worldMouseX - player.x;
@@ -190,6 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('achievements-screen').classList.remove('hidden');
                 document.body.classList.add('achievements-open');
                 if (typeof renderAchievementsPage === 'function') renderAchievementsPage();
+                
+                // Play achievement music
+                if (typeof MusicManager !== 'undefined') {
+                    MusicManager.play('achievement');
+                }
             });
         });
     }
@@ -201,8 +214,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('achievements-screen').classList.add('hidden');
                 document.getElementById('overlay').classList.remove('hidden');
                 document.body.classList.remove('achievements-open');
+                
+                // Return to home music
+                if (typeof MusicManager !== 'undefined') {
+                    MusicManager.play('home');
+                }
             });
         });
+    }
+
+    // Music toggle button - toggles music on/off with localStorage persistence
+    const musicToggleBtn = document.getElementById('music-toggle');
+    const musicIconEl = document.getElementById('music-icon');
+    
+    if (musicToggleBtn && musicIconEl) {
+        console.log('[Input] Music toggle button found, attaching handler');
+        
+        // Function to update icon based on state
+        const updateMusicIcon = (isEnabled) => {
+            musicIconEl.textContent = isEnabled ? '🔊' : '🔇';
+            musicToggleBtn.classList.toggle('disabled', !isEnabled);
+        };
+        
+        // Click handler with push-in animation
+        const handleMusicToggle = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('[Input] Music toggle clicked');
+            
+            // Add push-in animation class
+            musicToggleBtn.classList.add('pushed');
+            
+            // Remove class after animation
+            setTimeout(() => {
+                musicToggleBtn.classList.remove('pushed');
+            }, 150);
+            
+            if (typeof MusicManager === 'undefined') {
+                console.warn('[Input] MusicManager not available');
+                return;
+            }
+            
+            // Ensure user interaction is registered
+            MusicManager.onUserInteraction();
+            
+            // Toggle music and update icon
+            const isEnabled = MusicManager.toggle();
+            updateMusicIcon(isEnabled);
+            
+            console.log('[Input] Music toggled, enabled:', isEnabled);
+        };
+        
+        // Attach click event
+        musicToggleBtn.addEventListener('click', handleMusicToggle);
+        
+        // Also attach touchend for mobile (prevents double-tap issues)
+        musicToggleBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handleMusicToggle(e);
+        }, { passive: false });
+        
+        // Initialize icon state after MusicManager is ready
+        setTimeout(() => {
+            if (typeof MusicManager !== 'undefined') {
+                const isEnabled = MusicManager.isEnabled();
+                updateMusicIcon(isEnabled);
+                console.log('[Input] Music icon initialized, enabled:', isEnabled);
+            }
+        }, 300);
+    } else {
+        console.warn('[Input] Music toggle button or icon not found');
     }
 
     // Pause button - with delay for push-in animation

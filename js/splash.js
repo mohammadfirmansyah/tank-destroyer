@@ -82,6 +82,12 @@ function initSplash() {
 
 // Start the actual splash screen animations
 function startSplashAnimations() {
+    // Request opening music immediately - MusicManager will queue it
+    // until user interacts with the page (browser autoplay policy)
+    if (typeof MusicManager !== 'undefined') {
+        MusicManager.play('opening');
+    }
+    
     // Add initial entrance effect to first page
     const firstPage = document.querySelector('.splash-page[data-page="1"]');
     const firstDot = document.querySelector('.dot[data-page="1"]');
@@ -236,6 +242,11 @@ function dismissSplash() {
 
 // Show homepage with demo battle background
 function showHomepage() {
+    // Switch to home music when homepage shows
+    if (typeof MusicManager !== 'undefined') {
+        MusicManager.play('home');
+    }
+    
     // NOTE: Demo is now started early in dismissSplash() for smooth transition
     // No need to call initDemo() here - it's already running behind the splash
     
@@ -270,4 +281,18 @@ function showHomepage() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initSplash();
+    
+    // Add click/tap listener to advance splash and trigger music
+    const splashEl = document.getElementById('splash-screen');
+    if (splashEl) {
+        const advanceSplash = (e) => {
+            // Notify MusicManager of user interaction
+            if (typeof MusicManager !== 'undefined') {
+                MusicManager.onUserInteraction();
+            }
+            nextPage();
+        };
+        splashEl.addEventListener('click', advanceSplash);
+        splashEl.addEventListener('touchstart', advanceSplash, { passive: true });
+    }
 });

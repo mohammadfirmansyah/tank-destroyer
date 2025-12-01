@@ -8,6 +8,25 @@
 	--font-primary: 'Rajdhani', system-ui, sans-serif;
 	--font-display: 'Black Ops One', 'Impact', sans-serif;
 	--font-mono: 'Orbitron', monospace;
+	
+	/* === RESPONSIVE TEXT SIZE VARIABLES ===
+	 * Use these variables for consistent text sizing across all screens
+	 * Minimum: small screens | Preferred: viewport-based | Maximum: large screens */
+	--text-xs: clamp(7px, 1.5vw, 9px);
+	--text-sm: clamp(8px, 1.8vw, 11px);
+	--text-base: clamp(10px, 2vw, 13px);
+	--text-md: clamp(11px, 2.2vw, 14px);
+	--text-lg: clamp(13px, 2.5vw, 16px);
+	--text-xl: clamp(16px, 3vw, 20px);
+	--text-2xl: clamp(20px, 4vw, 28px);
+	--text-3xl: clamp(24px, 5vw, 36px);
+	
+	/* === RESPONSIVE SPACING VARIABLES === */
+	--space-xs: clamp(2px, 0.5vw, 4px);
+	--space-sm: clamp(4px, 1vw, 8px);
+	--space-md: clamp(8px, 2vw, 16px);
+	--space-lg: clamp(12px, 3vw, 24px);
+	--space-xl: clamp(16px, 4vw, 32px);
 }
 
 /* === MOBILE-COMPATIBLE GPU HINTS === */
@@ -39,7 +58,6 @@ body {
 /* Canvas rendering - mobile-safe GPU hints */
 /* Blocky pixel-art look (like Minecraft) - no smoothing/blur */
 #gameCanvas,
-#minimap,
 #demo-canvas {
 	/* 
 	 * Mobile GPU Compatibility Notes:
@@ -52,6 +70,14 @@ body {
 	image-rendering: crisp-edges;
 	-ms-interpolation-mode: nearest-neighbor;
 	/* Backface hidden helps prevent flickering during transitions */
+	-webkit-backface-visibility: hidden;
+	backface-visibility: hidden;
+}
+
+/* Minimap uses smooth rendering for better visibility */
+#minimap {
+	image-rendering: auto;
+	image-rendering: smooth;
 	-webkit-backface-visibility: hidden;
 	backface-visibility: hidden;
 }
@@ -3404,6 +3430,90 @@ body.touch-controls-hidden .joystick-container {
 	opacity: 0.7;
 }
 
+/* Music Credits & Toggle - Bottom Left (mirrors version-number style) */
+.music-credits {
+	position: absolute;
+	bottom: clamp(12px, 3vh, 25px);
+	left: clamp(15px, 4vw, 30px);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	z-index: 10;
+}
+
+.music-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	background: linear-gradient(135deg, rgba(70, 60, 50, 0.6), rgba(50, 40, 30, 0.8));
+	border: 2px solid rgba(139, 115, 85, 0.5);
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	user-select: none;
+}
+
+.music-toggle:hover {
+	background: linear-gradient(135deg, rgba(90, 80, 70, 0.7), rgba(70, 60, 50, 0.9));
+	border-color: rgba(139, 115, 85, 0.8);
+	transform: scale(1.05);
+}
+
+.music-toggle:active {
+	transform: scale(0.95);
+}
+
+.music-toggle.pushed {
+	transform: scale(0.85);
+	transition: transform 0.1s ease;
+}
+
+.music-toggle.disabled {
+	opacity: 0.6;
+	filter: grayscale(50%);
+}
+
+.music-toggle.disabled:hover {
+	background: linear-gradient(135deg, rgba(70, 60, 50, 0.5), rgba(50, 40, 30, 0.7));
+}
+
+.music-icon {
+	font-size: 16px;
+	line-height: 1;
+	transition: transform 0.2s ease;
+}
+
+.music-toggle:hover .music-icon {
+	transform: scale(1.1);
+}
+
+.music-text {
+	font-family: 'Rajdhani', var(--font-mono), monospace;
+	font-size: clamp(8px, 1.2vw, 11px);
+	font-weight: 500;
+	color: rgba(212, 197, 176, 0.4);
+	letter-spacing: 1.5px;
+	text-transform: uppercase;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+	padding: 3px 8px;
+	background: linear-gradient(90deg, 
+		rgba(70, 60, 50, 0.15) 0%, 
+		rgba(70, 60, 50, 0.12) 50%, 
+		transparent 100%
+	);
+	border-radius: 3px;
+	user-select: none;
+	white-space: nowrap;
+}
+
+/* Hover effect for music credits */
+#overlay:hover .music-text {
+	color: rgba(212, 197, 176, 0.6);
+}
+
 .hidden {
 	display: none !important;
 }
@@ -4280,23 +4390,7 @@ body.touch-controls-hidden .joystick-container {
 	gap: clamp(12px, 2.5vw, 18px);
 	transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 	position: relative;
-	overflow: hidden;
-}
-
-/* Subtle shine effect on cards */
-.achievement-item::before {
-	content: '';
-	position: absolute;
-	top: 0;
-	left: -100%;
-	width: 100%;
-	height: 100%;
-	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
-	transition: left 0.6s ease;
-}
-
-.achievement-item:hover::before {
-	left: 100%;
+	overflow: visible;
 }
 
 .achievement-item:hover {
@@ -4479,6 +4573,197 @@ body.touch-controls-hidden .joystick-container {
 	0% { filter: blur(4px) hue-rotate(0deg); }
 	100% { filter: blur(4px) hue-rotate(360deg); }
 }
+
+/* ====== SHIMMER STROKE EFFECT FOR ACHIEVEMENT BORDERS ====== */
+/* Light sweep effect on border, moving straight from right to left (horizontal) */
+/* Uses ::before pseudo-element with horizontal gradient for border shimmer */
+
+/* Level 1 (Bronze) - Warm shimmer on border */
+.achievement-item.level-1 {
+	position: relative;
+	border: 2px solid transparent;
+	background: 
+		linear-gradient(145deg, rgba(55, 47, 40, 0.95), rgba(40, 34, 28, 0.98)) padding-box,
+		linear-gradient(120deg, 
+			rgba(165, 102, 40, 0.5) 0%, 
+			rgba(165, 102, 40, 0.5) 100%
+		) border-box;
+}
+
+.achievement-item.level-1::before {
+	content: '';
+	position: absolute;
+	top: -2px;
+	left: -2px;
+	right: -2px;
+	bottom: -2px;
+	border-radius: 14px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		transparent 30%,
+		rgba(255, 200, 120, 0.9) 45%,
+		rgba(255, 230, 180, 1) 50%,
+		rgba(255, 200, 120, 0.9) 55%,
+		transparent 70%,
+		transparent 100%
+	);
+	background-size: 300% 100%;
+	animation: shimmerSlideHorizontal 5s linear infinite;
+	z-index: -1;
+	pointer-events: none;
+	mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	mask-composite: xor;
+	-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	-webkit-mask-composite: xor;
+	padding: 2px;
+}
+
+/* Level 2 (Silver) - Cool shimmer on border */
+.achievement-item.level-2 {
+	position: relative;
+	border: 2px solid transparent;
+	background: 
+		linear-gradient(145deg, rgba(55, 50, 55, 0.95), rgba(40, 38, 42, 0.98)) padding-box,
+		linear-gradient(120deg, 
+			rgba(160, 170, 190, 0.5) 0%, 
+			rgba(160, 170, 190, 0.5) 100%
+		) border-box;
+}
+
+.achievement-item.level-2::before {
+	content: '';
+	position: absolute;
+	top: -2px;
+	left: -2px;
+	right: -2px;
+	bottom: -2px;
+	border-radius: 14px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		transparent 25%,
+		rgba(200, 210, 230, 0.9) 40%,
+		rgba(240, 245, 255, 1) 50%,
+		rgba(200, 210, 230, 0.9) 60%,
+		transparent 75%,
+		transparent 100%
+	);
+	background-size: 300% 100%;
+	animation: shimmerSlideHorizontal 5s linear infinite;
+	z-index: -1;
+	pointer-events: none;
+	mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	mask-composite: xor;
+	-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	-webkit-mask-composite: xor;
+	padding: 2px;
+}
+
+/* Level 3 (Gold) - Radiant shimmer on border */
+.achievement-item.level-3 {
+	position: relative;
+	border: 3px solid transparent;
+	background: 
+		linear-gradient(145deg, rgba(60, 50, 30, 0.95), rgba(45, 38, 25, 0.98)) padding-box,
+		linear-gradient(120deg, 
+			rgba(200, 170, 0, 0.6) 0%, 
+			rgba(200, 170, 0, 0.6) 100%
+		) border-box;
+}
+
+.achievement-item.level-3::before {
+	content: '';
+	position: absolute;
+	top: -3px;
+	left: -3px;
+	right: -3px;
+	bottom: -3px;
+	border-radius: 15px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		transparent 20%,
+		rgba(255, 220, 80, 0.9) 35%,
+		rgba(255, 255, 200, 1) 50%,
+		rgba(255, 220, 80, 0.9) 65%,
+		transparent 80%,
+		transparent 100%
+	);
+	background-size: 300% 100%;
+	animation: shimmerSlideHorizontal 5s linear infinite;
+	z-index: -1;
+	pointer-events: none;
+	mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	mask-composite: xor;
+	-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	-webkit-mask-composite: xor;
+	padding: 3px;
+}
+
+/* Max Level - Rainbow shimmer on border */
+.achievement-item.max-level {
+	position: relative;
+	border: 3px solid transparent;
+	background: 
+		linear-gradient(145deg, rgba(60, 50, 30, 0.95), rgba(45, 38, 25, 0.98)) padding-box,
+		linear-gradient(120deg, 
+			rgba(255, 215, 0, 0.7) 0%, 
+			rgba(255, 215, 0, 0.7) 100%
+		) border-box;
+}
+
+.achievement-item.max-level::before {
+	content: '';
+	position: absolute;
+	top: -3px;
+	left: -3px;
+	right: -3px;
+	bottom: -3px;
+	border-radius: 15px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		transparent 15%,
+		rgba(255, 100, 100, 1) 25%,
+		rgba(255, 200, 50, 1) 35%,
+		rgba(150, 255, 150, 1) 50%,
+		rgba(100, 200, 255, 1) 65%,
+		rgba(200, 150, 255, 1) 75%,
+		transparent 85%,
+		transparent 100%
+	);
+	background-size: 300% 100%;
+	animation: shimmerSlideHorizontal 5s linear infinite;
+	z-index: -1;
+	pointer-events: none;
+	mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	mask-composite: xor;
+	-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+	-webkit-mask-composite: xor;
+	padding: 3px;
+}
+
+/* Shimmer slide animation - moves straight from right to left (horizontal) */
+/* Uses wider range so shimmer fully exits before looping */
+@keyframes shimmerSlideHorizontal {
+	0% {
+		background-position: 200% 50%;
+	}
+	100% {
+		background-position: -100% 50%;
+	}
+}
+
+/* Hover states - faster shimmer (horizontal) */
+.achievement-item.level-1:hover::before,
+.achievement-item.level-2:hover::before,
+.achievement-item.level-3:hover::before,
+.achievement-item.max-level:hover::before {
+	animation: shimmerSlideHorizontal 3s linear infinite;
+}
+
+/* ====== END SHIMMER STROKE EFFECT ====== */
 
 /* Temperature Critical - Blinking animation when temp >= 100% */
 #temp-indicator.temp-critical span {
@@ -5962,6 +6247,19 @@ body.demo-active .fps-hud {
 	}
 }
 
+/* Landscape mode - move benchmark box higher to avoid UI overlap */
+@media (orientation: landscape) and (max-height: 500px) {
+	.demo-benchmark-hud {
+		bottom: auto;
+		top: 50%;
+		transform: translateX(-50%) translateY(-50%) scale(0.9);
+	}
+	
+	.demo-benchmark-hud.active {
+		transform: translateX(-50%) translateY(-50%) scale(1);
+	}
+}
+
 /* Header container */
 .demo-benchmark-hud .benchmark-header {
 	display: flex;
@@ -6162,5 +6460,36 @@ body.demo-active .fps-hud {
 	.demo-benchmark-hud .quality-badge {
 		font-size: 10px;
 		padding: 2px 8px;
+	}
+}
+
+/* Landscape mode - adjusted spacing and positioning */
+@media (orientation: landscape) and (max-height: 600px) {
+	.demo-benchmark-hud {
+		bottom: clamp(80px, 12vh, 120px);
+		padding: 8px 16px 6px;
+	}
+	
+	.demo-benchmark-hud .benchmark-stats {
+		gap: 16px;
+	}
+	
+	.demo-benchmark-hud .benchmark-header {
+		gap: 4px;
+		margin-bottom: 6px;
+		padding-bottom: 6px;
+	}
+	
+	.demo-benchmark-hud .benchmark-value {
+		font-size: 12px;
+	}
+	
+	.demo-benchmark-hud .benchmark-label {
+		font-size: 7px;
+	}
+	
+	.demo-benchmark-hud .benchmark-footer {
+		margin-top: 6px;
+		padding-top: 6px;
 	}
 }

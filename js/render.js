@@ -5,6 +5,72 @@
 // Visual turret recoil: turret physically shifts in firing direction for realistic feedback
 
 // =============================================================================
+// DEFERRED STATUS BAR RENDERING SYSTEM
+// Status bars are collected during entity rendering and drawn in a batch
+// AFTER fog of war, ensuring they always appear on top and aren't affected
+// by the pixelated canvas rendering style
+// =============================================================================
+
+// Queue for deferred status bar rendering
+let statusBarQueue = [];
+
+// Add status bar to deferred rendering queue
+// This allows status bars to be rendered after fog of war layer
+function queueStatusBar(screenX, screenY, entity, entityType, frame) {
+    statusBarQueue.push({
+        screenX: screenX,
+        screenY: screenY,
+        entity: entity,
+        entityType: entityType,
+        frame: frame
+    });
+}
+
+// Render all queued status bars (call after fog of war)
+// Uses smooth rendering (not affected by pixelated canvas style)
+function renderDeferredStatusBars() {
+    if (statusBarQueue.length === 0) return;
+    
+    CTX.save();
+    
+    // Reset transform for overlay rendering (screen space)
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    
+    // Enable smooth rendering for status bars
+    // This counteracts the CSS image-rendering: pixelated
+    CTX.imageSmoothingEnabled = true;
+    if (CTX.imageSmoothingQuality) CTX.imageSmoothingQuality = 'high';
+    
+    // Get reference zoom for consistent status bar sizing
+    const refZoom = calculateReferenceZoom();
+    
+    // Apply camera transform for world-space status bars
+    CTX.translate(-camX, -camY);
+    
+    // Render each queued status bar
+    for (const bar of statusBarQueue) {
+        drawUnifiedStatusPanelDeferred(
+            bar.screenX, 
+            bar.screenY, 
+            bar.entity, 
+            bar.entityType, 
+            bar.frame,
+            refZoom
+        );
+    }
+    
+    CTX.restore();
+    
+    // Clear queue for next frame
+    statusBarQueue = [];
+}
+
+// Clear status bar queue (call at start of draw())
+function clearStatusBarQueue() {
+    statusBarQueue = [];
+}
+
+// =============================================================================
 // VIEWPORT CULLING SYSTEM - Only render objects visible on screen
 // This significantly improves performance by skipping off-screen rendering
 // =============================================================================
@@ -51,6 +117,222 @@ function isCircleInViewport(x, y, radius) {
            x - radius <= viewportRight &&
            y + radius >= viewportTop &&
            y - radius <= viewportBottom;
+}
+
+// =============================================================================
+// OFF-SCREEN BULLET WARNING INDICATOR SYSTEM
+// Shows animated "!" indicators at screen edges when enemy bullets are 
+// approaching from outside the viewport
+// =============================================================================
+
+// Animation clock for warning indicators
+let bulletWarningAnimClock = 0;
+
+// Check if a bullet is outside viewport but heading toward viewport
+// Returns edge info if warning should be shown, null otherwise
+function checkBulletApproaching(bullet, margin = 200) {
+    // Only check enemy bullets
+    if (!bullet.isEnemy) return null;
+    
+    // Check if bullet is outside viewport
+    const outsideLeft = bullet.x < viewportLeft - 10;
+    const outsideRight = bullet.x > viewportRight + 10;
+    const outsideTop = bullet.y < viewportTop - 10;
+    const outsideBottom = bullet.y > viewportBottom + 10;
+    
+    // If bullet is inside viewport, no warning needed
+    if (!outsideLeft && !outsideRight && !outsideTop && !outsideBottom) return null;
+    
+    // Skip bullets too far away
+    if (bullet.x < viewportLeft - margin || bullet.x > viewportRight + margin ||
+        bullet.y < viewportTop - margin || bullet.y > viewportBottom + margin) return null;
+    
+    // Check if bullet is heading toward viewport
+    const headingRight = bullet.vx > 0;
+    const headingLeft = bullet.vx < 0;
+    const headingDown = bullet.vy > 0;
+    const headingUp = bullet.vy < 0;
+    
+    // Determine if bullet will enter viewport based on velocity direction
+    let willEnter = false;
+    let edge = null; // 'left', 'right', 'top', 'bottom'
+    let edgeX = 0;
+    let edgeY = 0;
+    
+    // Calculate where bullet would intersect viewport edge
+    if (outsideLeft && headingRight) {
+        // Bullet is on left, moving right - will enter from left edge
+        const timeToEdge = (viewportLeft - bullet.x) / bullet.vx;
+        const yAtEdge = bullet.y + bullet.vy * timeToEdge;
+        if (yAtEdge >= viewportTop && yAtEdge <= viewportBottom && timeToEdge > 0 && timeToEdge < 60) {
+            willEnter = true;
+            edge = 'left';
+            edgeX = viewportLeft + 30;
+            edgeY = Math.max(viewportTop + 30, Math.min(viewportBottom - 30, yAtEdge));
+        }
+    }
+    
+    if (outsideRight && headingLeft) {
+        // Bullet is on right, moving left - will enter from right edge
+        const timeToEdge = (viewportRight - bullet.x) / bullet.vx;
+        const yAtEdge = bullet.y + bullet.vy * timeToEdge;
+        if (yAtEdge >= viewportTop && yAtEdge <= viewportBottom && timeToEdge > 0 && timeToEdge < 60) {
+            willEnter = true;
+            edge = 'right';
+            edgeX = viewportRight - 30;
+            edgeY = Math.max(viewportTop + 30, Math.min(viewportBottom - 30, yAtEdge));
+        }
+    }
+    
+    if (outsideTop && headingDown) {
+        // Bullet is above, moving down - will enter from top edge
+        const timeToEdge = (viewportTop - bullet.y) / bullet.vy;
+        const xAtEdge = bullet.x + bullet.vx * timeToEdge;
+        if (xAtEdge >= viewportLeft && xAtEdge <= viewportRight && timeToEdge > 0 && timeToEdge < 60) {
+            willEnter = true;
+            edge = 'top';
+            edgeX = Math.max(viewportLeft + 30, Math.min(viewportRight - 30, xAtEdge));
+            edgeY = viewportTop + 30;
+        }
+    }
+    
+    if (outsideBottom && headingUp) {
+        // Bullet is below, moving up - will enter from bottom edge
+        const timeToEdge = (viewportBottom - bullet.y) / bullet.vy;
+        const xAtEdge = bullet.x + bullet.vx * timeToEdge;
+        if (xAtEdge >= viewportLeft && xAtEdge <= viewportRight && timeToEdge > 0 && timeToEdge < 60) {
+            willEnter = true;
+            edge = 'bottom';
+            edgeX = Math.max(viewportLeft + 30, Math.min(viewportRight - 30, xAtEdge));
+            edgeY = viewportBottom - 30;
+        }
+    }
+    
+    if (!willEnter) return null;
+    
+    // Calculate distance for urgency (closer = more urgent)
+    const dist = Math.hypot(bullet.x - (viewportLeft + viewportRight) / 2, 
+                            bullet.y - (viewportTop + viewportBottom) / 2);
+    const urgency = Math.max(0.3, Math.min(1, 1 - dist / (margin * 1.5)));
+    
+    return { edge, edgeX, edgeY, urgency, bullet };
+}
+
+// Draw warning indicator at screen edge (world coordinates)
+// Uses animated "!" with pulsing effect and 50% opacity
+function drawBulletWarningIndicator(warning, animClock) {
+    const { edgeX, edgeY, urgency, edge } = warning;
+    
+    // Animation parameters
+    const pulseSpeed = 0.15;
+    const pulse = Math.sin(animClock * pulseSpeed) * 0.3 + 0.7; // 0.4 to 1.0
+    const shake = Math.sin(animClock * 0.3) * 3 * urgency;
+    
+    // Base alpha is 50% with urgency and pulse modulation
+    const baseAlpha = 0.5;
+    const alpha = baseAlpha * pulse * (0.5 + urgency * 0.5);
+    
+    // Calculate offset position with shake
+    let drawX = edgeX;
+    let drawY = edgeY;
+    
+    // Add directional shake based on edge
+    if (edge === 'left' || edge === 'right') {
+        drawY += shake;
+    } else {
+        drawX += shake;
+    }
+    
+    // Warning colors - red with white core
+    const outerColor = `rgba(255, 60, 60, ${alpha})`;
+    const innerColor = `rgba(255, 200, 200, ${alpha * 1.5})`;
+    
+    CTX.save();
+    
+    // Scale based on pulse
+    const scale = 0.8 + pulse * 0.4 + urgency * 0.3;
+    CTX.translate(drawX, drawY);
+    CTX.scale(scale, scale);
+    
+    // Glow effect
+    CTX.shadowColor = 'rgba(255, 50, 50, 0.8)';
+    CTX.shadowBlur = 15 * urgency;
+    
+    // Draw exclamation mark "!"
+    CTX.font = 'bold 28px Arial';
+    CTX.textAlign = 'center';
+    CTX.textBaseline = 'middle';
+    
+    // Outer stroke for visibility
+    CTX.strokeStyle = 'rgba(0, 0, 0, ' + (alpha * 0.8) + ')';
+    CTX.lineWidth = 4;
+    CTX.strokeText('!', 0, 0);
+    
+    // Main fill with gradient
+    CTX.fillStyle = innerColor;
+    CTX.fillText('!', 0, 0);
+    
+    // Add small direction arrow based on bullet approach
+    const arrowSize = 8;
+    CTX.fillStyle = outerColor;
+    CTX.beginPath();
+    
+    if (edge === 'left') {
+        // Arrow pointing right (bullet coming from left)
+        CTX.moveTo(-18, 0);
+        CTX.lineTo(-18 - arrowSize, -arrowSize / 2);
+        CTX.lineTo(-18 - arrowSize, arrowSize / 2);
+    } else if (edge === 'right') {
+        // Arrow pointing left (bullet coming from right)
+        CTX.moveTo(18, 0);
+        CTX.lineTo(18 + arrowSize, -arrowSize / 2);
+        CTX.lineTo(18 + arrowSize, arrowSize / 2);
+    } else if (edge === 'top') {
+        // Arrow pointing down (bullet coming from top)
+        CTX.moveTo(0, -18);
+        CTX.lineTo(-arrowSize / 2, -18 - arrowSize);
+        CTX.lineTo(arrowSize / 2, -18 - arrowSize);
+    } else if (edge === 'bottom') {
+        // Arrow pointing up (bullet coming from bottom)
+        CTX.moveTo(0, 18);
+        CTX.lineTo(-arrowSize / 2, 18 + arrowSize);
+        CTX.lineTo(arrowSize / 2, 18 + arrowSize);
+    }
+    CTX.closePath();
+    CTX.fill();
+    
+    CTX.restore();
+}
+
+// Main function to render all bullet warning indicators
+// Call this after bullets are processed but before UI overlay
+function drawAllBulletWarnings() {
+    if (typeof bullets === 'undefined' || !bullets || bullets.length === 0) return;
+    
+    // Increment animation clock
+    bulletWarningAnimClock++;
+    
+    // Collect all warnings (limit to prevent overdraw)
+    const warnings = [];
+    const maxWarnings = 8;
+    
+    for (let i = 0; i < bullets.length && warnings.length < maxWarnings; i++) {
+        const warning = checkBulletApproaching(bullets[i]);
+        if (warning) {
+            // Check if we already have a warning near this position (avoid stacking)
+            const tooClose = warnings.some(w => 
+                Math.hypot(w.edgeX - warning.edgeX, w.edgeY - warning.edgeY) < 50
+            );
+            if (!tooClose) {
+                warnings.push(warning);
+            }
+        }
+    }
+    
+    // Draw all warnings
+    for (const warning of warnings) {
+        drawBulletWarningIndicator(warning, bulletWarningAnimClock);
+    }
 }
 
 // =============================================================================
@@ -5132,6 +5414,10 @@ function draw() {
     // GPU Optimization: Reset transform state once at start to prevent transform accumulation
     CTX.setTransform(1, 0, 0, 1, 0, 0);
     
+    // === CLEAR DEFERRED STATUS BAR QUEUE ===
+    // Clear queue at start of each frame to prevent stale data
+    clearStatusBarQueue();
+    
     // Check if resolution scaling is enabled via debug flag
     const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
     
@@ -8423,11 +8709,10 @@ function draw() {
             CTX.restore();
         }
         
-        // === UNIFIED ENEMY STATUS PANEL ===
-        // Use unified status panel system for consistent HP + status bar display
-        // Draw in world space (camera transform already applied)
-        // This ensures consistent rendering with player status bars
-        drawUnifiedStatusPanel(e.x + exShake, e.y + eyShake, e, 'enemy', frame);
+        // === DEFERRED ENEMY STATUS PANEL ===
+        // Queue status bar for rendering AFTER fog of war layer
+        // This ensures status bars appear on top and use smooth rendering
+        queueStatusBar(e.x + exShake, e.y + eyShake, e, 'enemy', frame);
         
         // === MAGIC SHIELD RENDERING ===
         // Draw active magic shield around enemy
@@ -10122,11 +10407,10 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
                 'clone'                      // Tank type for proper color scheme
             );
             
-            // === UNIFIED CLONE STATUS PANEL ===
-            // Use unified status panel system for consistent HP + status bar display
-            // Draw in world space (camera transform already applied)
-            // This ensures consistent rendering with player status bars
-            drawUnifiedStatusPanel(clone.x, clone.y, clone, 'clone', frame);
+            // === DEFERRED CLONE STATUS PANEL ===
+            // Queue status bar for rendering AFTER fog of war layer
+            // This ensures status bars appear on top and use smooth rendering
+            queueStatusBar(clone.x, clone.y, clone, 'clone', frame);
             
             CTX.restore();
         }
@@ -11264,6 +11548,10 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
         
         CTX.restore();
     }
+
+    // === OFF-SCREEN BULLET WARNING INDICATORS ===
+    // Draw animated "!" at screen edges for enemy bullets approaching from off-screen
+    drawAllBulletWarnings();
 
     // Get adaptive quality for performance-based rendering
     const quality = (typeof getAdaptiveQuality === 'function') ? getAdaptiveQuality() : 1.0;
@@ -12507,6 +12795,11 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
     // Draw fog of war vignette effect
     drawFogOfWarVignette();
     
+    // === DEFERRED STATUS BAR RENDERING ===
+    // Render all queued status bars AFTER fog of war
+    // This ensures status bars appear on top of fog and use smooth rendering
+    renderDeferredStatusBars();
+    
     drawMinimap();
     
     // Draw FPS counter HUD at the very end (on top of everything)
@@ -12514,6 +12807,137 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
     if (typeof drawFPSCounterHUD === 'function') {
         drawFPSCounterHUD();
     }
+    
+    // === DESKTOP CROSSHAIR CURSOR ===
+    // Draw targeting crosshair at mouse position for desktop players
+    // Provides visual feedback for aiming direction
+    drawDesktopCrosshair();
+}
+
+// =============================================================================
+// DESKTOP CROSSHAIR CURSOR
+// Draws a military-style targeting reticle at the mouse position
+// Only visible when using mouse (desktop mode), hidden on touch devices
+// =============================================================================
+function drawDesktopCrosshair() {
+    // Only show crosshair in desktop mode with active mouse aim
+    if (typeof activeInputMode === 'undefined' || typeof INPUT_MODE === 'undefined') return;
+    if (activeInputMode !== INPUT_MODE.DESKTOP) return;
+    if (typeof mouseAim === 'undefined' || !mouseAim.active) return;
+    if (typeof player === 'undefined' || player.hp <= 0) return;
+    
+    // Hide crosshair during demo mode - no player control in demo
+    if (typeof demoActive !== 'undefined' && demoActive === true) return;
+    
+    // Get screen coordinates from mouseAim (CSS/screen pixel position)
+    const screenX = mouseAim.screenX;
+    const screenY = mouseAim.screenY;
+    
+    // Validate coordinates
+    if (typeof screenX !== 'number' || typeof screenY !== 'number') return;
+    if (isNaN(screenX) || isNaN(screenY)) return;
+    
+    CTX.save();
+    
+    // Reset transform for screen-space rendering
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    
+    // Get screen (CSS) dimensions for coordinate conversion
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Get buffer dimensions - displayWidth/Height are the reference buffer dims
+    const bufferW = (typeof displayWidth !== 'undefined') ? displayWidth : screenWidth;
+    const bufferH = (typeof displayHeight !== 'undefined') ? displayHeight : screenHeight;
+    
+    // Account for resolution scale if enabled
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    
+    // Final buffer dimensions (with resolution scale applied)
+    const finalBufferW = bufferW * resScale;
+    const finalBufferH = bufferH * resScale;
+    
+    // Convert screen position to buffer position
+    // Screen coords (CSS pixels) → Buffer coords (canvas pixels)
+    const drawX = screenX * finalBufferW / screenWidth;
+    const drawY = screenY * finalBufferH / screenHeight;
+    
+    // Crosshair configuration
+    const outerRadius = 18;  // Outer ring radius
+    const innerRadius = 4;   // Center dot radius
+    const lineLength = 10;   // Length of crosshair lines
+    const lineGap = 8;       // Gap between center and lines
+    const lineWidth = 2.5;   // Thickness of lines
+    
+    // Animation based on frame
+    const time = typeof frame !== 'undefined' ? frame : 0;
+    const pulse = 1 + Math.sin(time * 0.1) * 0.08; // Subtle size pulse
+    
+    // Consistent crosshair color - always use military red for clear visibility
+    const crosshairColor = 'rgba(255, 80, 80, 0.9)';  // Military red
+    const glowColor = 'rgba(255, 100, 100, 0.4)';
+    
+    // Smooth rendering
+    CTX.imageSmoothingEnabled = true;
+    CTX.lineCap = 'round';
+    CTX.lineJoin = 'round';
+    
+    // Outer glow
+    CTX.shadowColor = glowColor;
+    CTX.shadowBlur = 12;
+    
+    // Draw outer circle
+    CTX.strokeStyle = crosshairColor;
+    CTX.lineWidth = lineWidth * 0.8;
+    CTX.beginPath();
+    CTX.arc(drawX, drawY, outerRadius * pulse, 0, Math.PI * 2);
+    CTX.stroke();
+    
+    // Draw crosshair lines (4 directions)
+    CTX.lineWidth = lineWidth;
+    
+    // Top line
+    CTX.beginPath();
+    CTX.moveTo(drawX, drawY - lineGap);
+    CTX.lineTo(drawX, drawY - lineGap - lineLength);
+    CTX.stroke();
+    
+    // Bottom line
+    CTX.beginPath();
+    CTX.moveTo(drawX, drawY + lineGap);
+    CTX.lineTo(drawX, drawY + lineGap + lineLength);
+    CTX.stroke();
+    
+    // Left line
+    CTX.beginPath();
+    CTX.moveTo(drawX - lineGap, drawY);
+    CTX.lineTo(drawX - lineGap - lineLength, drawY);
+    CTX.stroke();
+    
+    // Right line
+    CTX.beginPath();
+    CTX.moveTo(drawX + lineGap, drawY);
+    CTX.lineTo(drawX + lineGap + lineLength, drawY);
+    CTX.stroke();
+    
+    // Center dot
+    CTX.shadowBlur = 6;
+    CTX.fillStyle = crosshairColor;
+    CTX.beginPath();
+    CTX.arc(drawX, drawY, innerRadius, 0, Math.PI * 2);
+    CTX.fill();
+    
+    // Inner highlight
+    CTX.shadowBlur = 0;
+    CTX.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    CTX.beginPath();
+    CTX.arc(drawX, drawY, innerRadius * 0.5, 0, Math.PI * 2);
+    CTX.fill();
+    
+    CTX.restore();
 }
 
 // Draw fog of war effect - creates immersive battlefield atmosphere with animated fog
@@ -13457,6 +13881,7 @@ const STATUS_EFFECT_CONFIG = {
 
 // Draw elegant status bar with particles and effects - NO EMOJI, larger text
 // resScale parameter ensures HUD elements maintain consistent visual size during resolution scaling
+// Uses smooth rendering techniques to avoid blocky/pixelated appearance from CSS image-rendering
 function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label, value, frame, isNegative = false, resScale = 1.0) {
     const clampedProgress = Math.max(0, Math.min(1, progress));
     const fillWidth = width * clampedProgress;
@@ -13466,8 +13891,13 @@ function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label
     const lineWidthScaled = Math.max(0.5, 1 * resScale);
     const pulseRadius = Math.max(1, 2 * resScale);
     
-    // Outer glow effect
+    // === SMOOTH RENDERING FOR STATUS BARS ===
+    // Enable anti-aliasing and smooth rendering to counter CSS pixelated effect
     ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Outer glow effect;
     ctx.shadowColor = config.colors.glow;
     ctx.shadowBlur = (6 + Math.sin(frame * 0.1) * 2) * resScale;
     
@@ -13524,11 +13954,30 @@ function drawStatusBarEnhanced(ctx, x, y, width, height, progress, config, label
 // entityType = 'player', 'enemy', 'clone', 'boss'
 // Status bars are rendered at fixed size - CTX.scale() in draw() handles resolution scaling
 function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
-    // Fixed dimensions - no manual scaling needed since CTX.scale() is applied in draw()
-    // This ensures status bars appear the same size regardless of resolution scaling
-    const PANEL_WIDTH = entityType === 'boss' ? 100 : 50;
-    const BAR_HEIGHT = entityType === 'boss' ? 10 : 6;
-    const BAR_GAP = entityType === 'boss' ? 5 : 4;
+    // === RESOLUTION SCALING COMPENSATION ===
+    // Check if resolution scaling is active and get the scale factor
+    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
+    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
+        ? currentResolutionScale 
+        : 1.0;
+    
+    // Calculate inverse scale to maintain consistent status bar size
+    // When resolution is scaled down (resScale < 1), we need to scale UP the bars
+    const inverseScale = 1 / resScale;
+    
+    // Apply inverse scale to position to account for camera transform that's already scaled
+    const adjustedX = screenX * resScale;
+    const adjustedY = screenY * resScale;
+    
+    // Fixed dimensions - adjusted by inverse scale to maintain consistent visual size
+    // When canvas is scaled down by resScale, we scale up dimensions by inverseScale
+    const baseWidth = entityType === 'boss' ? 100 : 50;
+    const baseHeight = entityType === 'boss' ? 10 : 6;
+    const baseGap = entityType === 'boss' ? 5 : 4;
+    
+    const PANEL_WIDTH = baseWidth;
+    const BAR_HEIGHT = baseHeight;
+    const BAR_GAP = baseGap;
     
     // Collect all active status effects (NOT including HP for player)
     const statusBars = [];
@@ -13771,26 +14220,32 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     if (statusBars.length === 0) {
         // Player always shows "YOURS" label even without bars
         if (entityType === 'player') {
-            const LABEL_HEIGHT = 12;
-            const labelY = screenY - 45 - LABEL_HEIGHT + 6;
+            const scaledLabelHeight = 12 * inverseScale;
+            const labelY = screenY - (45 * inverseScale) - scaledLabelHeight + (6 * inverseScale);
             
             CTX.save();
+            
+            // === SMOOTH RENDERING FOR LABEL ===
+            CTX.imageSmoothingEnabled = true;
+            if (CTX.imageSmoothingQuality) CTX.imageSmoothingQuality = 'high';
             
             // Draw "YOURS" label with dramatic glow effect
             const pulse = 1 + Math.sin(frame * 0.08) * 0.3 * 0.3;
             
-            CTX.font = 'bold 8px Arial';
+            // Scale font size by inverse scale to maintain consistent visual size
+            const baseFontSize = 8 * inverseScale;
+            CTX.font = `bold ${Math.round(baseFontSize)}px Arial`;
             CTX.textAlign = 'center';
             CTX.textBaseline = 'middle';
             
-            // Outer glow
+            // Outer glow - scale blur with inverse scale
             CTX.shadowColor = '#22c55e';
-            CTX.shadowBlur = 8 * pulse;
+            CTX.shadowBlur = 8 * pulse * inverseScale;
             CTX.fillStyle = '#4ade80';
             CTX.fillText('YOURS', screenX, labelY);
             
             // Inner brighter text
-            CTX.shadowBlur = 4;
+            CTX.shadowBlur = 4 * inverseScale;
             CTX.fillStyle = '#ffffff';
             CTX.globalAlpha = 0.7;
             CTX.fillText('YOURS', screenX, labelY);
@@ -13809,13 +14264,23 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     const orderedBars = hpBar ? [hpBar, ...otherBars] : otherBars;
     
     // Calculate panel dimensions - NO background box
-    // Fixed sizes - CTX.scale() in draw() handles resolution scaling automatically
-    const LABEL_HEIGHT = 12;
-    const totalBarsHeight = orderedBars.length * (BAR_HEIGHT + BAR_GAP) - BAR_GAP;
-    const panelX = screenX - PANEL_WIDTH / 2;
-    const panelY = screenY - 45 - totalBarsHeight - LABEL_HEIGHT;
+    // Use inverse scale to maintain consistent visual size during resolution scaling
+    const LABEL_HEIGHT = 12 * inverseScale;
+    const scaledBarHeight = BAR_HEIGHT * inverseScale;
+    const scaledBarGap = BAR_GAP * inverseScale;
+    const scaledPanelWidth = PANEL_WIDTH * inverseScale;
+    
+    const totalBarsHeight = orderedBars.length * (scaledBarHeight + scaledBarGap) - scaledBarGap;
+    const panelX = screenX - scaledPanelWidth / 2;
+    const panelY = screenY - (45 * inverseScale) - totalBarsHeight - LABEL_HEIGHT;
     
     CTX.save();
+    
+    // === SMOOTH RENDERING FOR STATUS PANEL ===
+    // Enable anti-aliasing for smoother text and shapes
+    // This counters the CSS image-rendering: pixelated effect for UI elements
+    CTX.imageSmoothingEnabled = true;
+    if (CTX.imageSmoothingQuality) CTX.imageSmoothingQuality = 'high';
     
     // Entity type label at top - elegant and dramatic styling
     let entityLabel = '';
@@ -13846,22 +14311,23 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     }
     
     // Draw entity label with dramatic glow effect
-    const labelY = panelY + 6;
+    const labelY = panelY + (6 * inverseScale);
     const pulse = 1 + Math.sin(frame * 0.08) * pulseIntensity * 0.3;
     
-    // Fixed font size - CTX.scale() handles resolution scaling
-    CTX.font = 'bold 8px Arial';
+    // Scale font size to maintain consistent visual size during resolution scaling
+    const baseFontSize = 8 * inverseScale;
+    CTX.font = `bold ${Math.round(baseFontSize)}px Arial`;
     CTX.textAlign = 'center';
     CTX.textBaseline = 'middle';
     
-    // Outer glow
+    // Outer glow - scale blur with inverse scale
     CTX.shadowColor = glowColor;
-    CTX.shadowBlur = 8 * pulse;
+    CTX.shadowBlur = 8 * pulse * inverseScale;
     CTX.fillStyle = labelColor;
     CTX.fillText(entityLabel, screenX, labelY);
     
     // Inner brighter text
-    CTX.shadowBlur = 4;
+    CTX.shadowBlur = 4 * inverseScale;
     CTX.fillStyle = '#ffffff';
     CTX.globalAlpha = 0.7;
     CTX.fillText(entityLabel, screenX, labelY);
@@ -13871,20 +14337,20 @@ function drawUnifiedStatusPanel(screenX, screenY, entity, entityType, frame) {
     // Draw each status bar - HP at bottom (first in draw order = bottom position)
     orderedBars.forEach((bar, index) => {
         // Draw from top to bottom, so HP (index 0) ends up at bottom visually
-        const barY = panelY + LABEL_HEIGHT + (orderedBars.length - 1 - index) * (BAR_HEIGHT + BAR_GAP);
+        const barY = panelY + LABEL_HEIGHT + (orderedBars.length - 1 - index) * (scaledBarHeight + scaledBarGap);
         drawStatusBarEnhanced(
             CTX,
             panelX,
             barY,
-            PANEL_WIDTH,
-            BAR_HEIGHT,
+            scaledPanelWidth,
+            scaledBarHeight,
             bar.progress,
             bar.config,
             bar.label,
             bar.value,
             frame,
             bar.type === 'cursedBurn' || bar.type === 'burning' || bar.type === 'frozen' || bar.type === 'slowed' || bar.type === 'stunned',
-            1.0  // No additional scaling needed - CTX.scale() already applied
+            inverseScale  // Pass inverse scale to maintain consistent visual size
         );
     });
     
@@ -13917,6 +14383,500 @@ function drawPlayerStatusBars(player, frame) {
     const screenX = player.x;
     const screenY = player.y;
     
-    // Use unified status panel system
-    drawUnifiedStatusPanel(screenX, screenY, player, 'player', frame);
+    // === DEFERRED PLAYER STATUS PANEL ===
+    // Queue status bar for rendering AFTER fog of war layer
+    // This ensures status bars appear on top and use smooth rendering
+    queueStatusBar(screenX, screenY, player, 'player', frame);
+}
+
+// =============================================================================
+// ALERT INDICATOR (!) RENDERING
+// Draws dramatic animated green "!" indicator above enemy status bar when alerted
+// Styled similar to edge bullet warning indicator but with green color
+// =============================================================================
+function drawAlertIndicator(ctx, x, y, remainingFrames, animFrame, sizeScale) {
+    // Animation phases:
+    // First 30 frames: Pop-in with scale bounce
+    // Middle: Pulse and glow
+    // Last 30 frames: Fade out
+    
+    const maxFrames = 120;
+    const elapsed = maxFrames - remainingFrames;
+    
+    // Calculate alpha based on lifecycle
+    let alpha = 1.0;
+    if (elapsed < 15) {
+        // Fade in during first 15 frames
+        alpha = elapsed / 15;
+    } else if (remainingFrames < 30) {
+        // Fade out during last 30 frames
+        alpha = remainingFrames / 30;
+    }
+    
+    // Scale animation - bounce effect on appear
+    let scale = 1.0;
+    if (elapsed < 20) {
+        // Pop-in bounce effect
+        const t = elapsed / 20;
+        // Overshoot bounce: goes to 1.5 then settles to 1.0
+        scale = 1.0 + Math.sin(t * Math.PI) * 0.5;
+    } else {
+        // Gentle pulse during visible phase
+        const pulseSpeed = 0.2;
+        scale = 1.0 + Math.sin(animFrame * pulseSpeed) * 0.15;
+    }
+    
+    // Shake effect - more intense initially, then subtle
+    let shakeX = 0;
+    let shakeY = 0;
+    if (elapsed < 30) {
+        // Intense shake during appear
+        const intensity = (30 - elapsed) / 30;
+        shakeX = (Math.sin(animFrame * 0.8) * 3 + Math.sin(animFrame * 1.3) * 2) * intensity;
+        shakeY = (Math.cos(animFrame * 0.7) * 2 + Math.cos(animFrame * 1.1) * 1.5) * intensity;
+    } else {
+        // Subtle vibration
+        shakeX = Math.sin(animFrame * 0.4) * 0.5;
+        shakeY = Math.cos(animFrame * 0.3) * 0.3;
+    }
+    
+    // Colors - bright green theme like edge shot indicator
+    const greenPrimary = '#22c55e';    // Main green
+    const greenGlow = '#4ade80';       // Bright green glow
+    const greenLight = '#86efac';      // Light green highlight
+    const greenDark = '#15803d';       // Dark green for outline
+    
+    // Glow intensity pulses
+    const glowPulse = 0.7 + Math.sin(animFrame * 0.25) * 0.3;
+    
+    ctx.save();
+    
+    // Position with shake offset
+    const drawX = x + shakeX * sizeScale;
+    const drawY = y + shakeY * sizeScale;
+    
+    // Apply transformations
+    ctx.translate(drawX, drawY);
+    ctx.scale(scale * sizeScale, scale * sizeScale);
+    ctx.globalAlpha = alpha;
+    
+    // Outer glow effect - multiple layers for dramatic effect
+    ctx.shadowColor = greenGlow;
+    ctx.shadowBlur = 20 * glowPulse;
+    
+    // Draw exclamation mark "!"
+    const fontSize = 28;
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Layer 1: Dark outline for visibility
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.strokeText('!', 0, 0);
+    
+    // Layer 2: Green border
+    ctx.strokeStyle = greenDark;
+    ctx.lineWidth = 2.5;
+    ctx.strokeText('!', 0, 0);
+    
+    // Layer 3: Main green fill
+    ctx.fillStyle = greenPrimary;
+    ctx.fillText('!', 0, 0);
+    
+    // Layer 4: Light highlight overlay
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.fillStyle = greenLight;
+    ctx.fillText('!', 0, -1);
+    
+    // Add radiating lines for extra drama (during appear phase)
+    if (elapsed < 40) {
+        const lineAlpha = ((40 - elapsed) / 40) * alpha * 0.5;
+        ctx.globalAlpha = lineAlpha;
+        ctx.strokeStyle = greenGlow;
+        ctx.lineWidth = 1.5;
+        
+        const numLines = 8;
+        const lineLength = 8 + (elapsed / 40) * 4;
+        const innerRadius = 12;
+        
+        for (let i = 0; i < numLines; i++) {
+            const angle = (i / numLines) * Math.PI * 2 + animFrame * 0.05;
+            const startX = Math.cos(angle) * innerRadius;
+            const startY = Math.sin(angle) * innerRadius;
+            const endX = Math.cos(angle) * (innerRadius + lineLength);
+            const endY = Math.sin(angle) * (innerRadius + lineLength);
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+    }
+    
+    ctx.restore();
+}
+
+// =============================================================================
+// DEFERRED STATUS BAR PANEL RENDERING
+// Used for rendering status bars AFTER fog of war layer
+// Ensures status bars appear smooth (not pixelated) and always on top
+// Uses reference resolution zoom for consistent sizing across screen sizes
+// =============================================================================
+function drawUnifiedStatusPanelDeferred(screenX, screenY, entity, entityType, frame, refZoom) {
+    // === REFERENCE ZOOM SCALING ===
+    // Use reference resolution zoom for consistent visual size across all screen sizes
+    const zoomScale = refZoom ? refZoom.zoom : 1.0;
+    
+    // Calculate scale factor for status bar sizing
+    // Base size is designed for reference resolution, zoom adjusts for actual screen
+    const sizeScale = 1.0; // Status bars maintain fixed pixel size relative to world
+    
+    // Fixed dimensions - designed for reference resolution
+    const baseWidth = entityType === 'boss' ? 100 : 50;
+    const baseHeight = entityType === 'boss' ? 10 : 6;
+    const baseGap = entityType === 'boss' ? 5 : 4;
+    
+    const PANEL_WIDTH = baseWidth * sizeScale;
+    const BAR_HEIGHT = baseHeight * sizeScale;
+    const BAR_GAP = baseGap * sizeScale;
+    
+    // Collect all active status effects (NOT including HP for player)
+    const statusBars = [];
+    
+    // HP Bar - only for enemy, clone, boss (NOT player in normal game)
+    // In DEMO mode, player also shows HP bar above tank for visibility
+    const showPlayerHpBar = entityType === 'player' && typeof demoActive !== 'undefined' && demoActive === true;
+    if (entityType !== 'player' || showPlayerHpBar) {
+        const hpRatio = entity.hp / Math.max(1, entity.maxHp);
+        
+        // Create entity-specific HP bar colors
+        let hpConfig;
+        
+        if (entityType === 'player') {
+            hpConfig = {
+                label: 'HP',
+                colors: {
+                    fill: hpRatio < 0.25 ? '#15803d' : '#22c55e',
+                    bg: '#14532d',
+                    glow: hpRatio < 0.25 ? '#86efac' : '#4ade80',
+                    border: '#16a34a'
+                },
+                particleColor: '#bbf7d0',
+                icon: '❤'
+            };
+        } else if (entityType === 'enemy') {
+            hpConfig = {
+                label: 'HP',
+                colors: {
+                    fill: hpRatio < 0.25 ? '#dc2626' : '#ef4444',
+                    bg: '#450a0a',
+                    glow: hpRatio < 0.25 ? '#fca5a5' : '#f87171',
+                    border: '#b91c1c'
+                },
+                particleColor: '#fecaca',
+                icon: '❤'
+            };
+        } else if (entityType === 'clone') {
+            hpConfig = {
+                label: 'HP',
+                colors: {
+                    fill: hpRatio < 0.25 ? '#15803d' : '#22c55e',
+                    bg: '#14532d',
+                    glow: hpRatio < 0.25 ? '#86efac' : '#4ade80',
+                    border: '#16a34a'
+                },
+                particleColor: '#bbf7d0',
+                icon: '❤'
+            };
+        } else if (entityType === 'boss') {
+            hpConfig = {
+                label: 'HP',
+                colors: {
+                    fill: hpRatio < 0.25 ? '#7c3aed' : '#a855f7',
+                    bg: '#2e1065',
+                    glow: hpRatio < 0.25 ? '#c4b5fd' : '#c084fc',
+                    border: '#8b5cf6'
+                },
+                particleColor: '#e9d5ff',
+                icon: '💀'
+            };
+        } else {
+            hpConfig = {
+                label: 'HP',
+                colors: { fill: '#22c55e', bg: '#14532d', glow: '#4ade80', border: '#16a34a' },
+                particleColor: '#86efac',
+                icon: '❤'
+            };
+        }
+        
+        statusBars.push({
+            type: 'hp',
+            config: hpConfig,
+            progress: hpRatio,
+            label: 'HP',
+            value: Math.ceil(entity.hp) + '/' + Math.ceil(entity.maxHp)
+        });
+    }
+    
+    // Shield bar
+    if (entity.shieldTime && entity.shieldTime > 0) {
+        let maxShield = 1200;
+        if (entityType === 'boss') maxShield = 600;
+        else if (entityType === 'clone') maxShield = 1200;
+        
+        statusBars.push({
+            type: 'shield',
+            config: STATUS_EFFECT_CONFIG.shield,
+            progress: Math.min(1, entity.shieldTime / maxShield),
+            label: 'SHIELD',
+            value: Math.ceil(entity.shieldTime / 60) + 's'
+        });
+    }
+    
+    // Armor bar
+    if (entity.armor && entity.armor > 0) {
+        statusBars.push({
+            type: 'armor',
+            config: STATUS_EFFECT_CONFIG.armor,
+            progress: Math.min(1, entity.armor / Math.max(1, entity.maxArmor || 100)),
+            label: 'ARMOR',
+            value: Math.ceil(entity.armor)
+        });
+    }
+    
+    // Player-specific effects
+    if (entityType === 'player') {
+        if (entity.turboActive && entity.turboTime > 0) {
+            statusBars.push({
+                type: 'turbo',
+                config: STATUS_EFFECT_CONFIG.turbo,
+                progress: entity.turboTime / Math.max(1, entity.turboDuration || 420),
+                label: 'TURBO',
+                value: Math.ceil(entity.turboTime / 60) + 's'
+            });
+        }
+        
+        if (entity.invisible && entity.invisibleTime > 0) {
+            statusBars.push({
+                type: 'cloak',
+                config: STATUS_EFFECT_CONFIG.cloak,
+                progress: entity.invisibleTime / 600,
+                label: 'CLOAK',
+                value: Math.ceil(entity.invisibleTime / 60) + 's'
+            });
+        }
+        
+        if (entity.magnetActive && entity.magnetTime > 0) {
+            statusBars.push({
+                type: 'magnet',
+                config: STATUS_EFFECT_CONFIG.magnet,
+                progress: entity.magnetTime / 600,
+                label: 'MAGNET',
+                value: Math.ceil(entity.magnetTime / 60) + 's'
+            });
+        }
+        
+        if (entity.autoAim && entity.autoAimShots > 0) {
+            statusBars.push({
+                type: 'autoAim',
+                config: STATUS_EFFECT_CONFIG.autoAim,
+                progress: entity.autoAimShots / Math.max(1, entity.autoAimMaxShots || 10),
+                label: 'AUTO',
+                value: 'x' + entity.autoAimShots
+            });
+        }
+        
+        if (entity.rage && entity.rage > 0) {
+            statusBars.push({
+                type: 'rage',
+                config: STATUS_EFFECT_CONFIG.rage,
+                progress: Math.min(1, entity.rage / 100),
+                label: 'RAGE',
+                value: Math.ceil(entity.rage) + '%'
+            });
+        }
+    }
+    
+    // Enemy/Clone debuff effects
+    if (entityType === 'enemy' || entityType === 'clone') {
+        if (entity.frozenTime && entity.frozenTime > 0) {
+            statusBars.push({
+                type: 'frozen',
+                config: STATUS_EFFECT_CONFIG.frozen,
+                progress: Math.min(1, entity.frozenTime / 180),
+                label: 'FROZEN',
+                value: Math.ceil(entity.frozenTime / 60) + 's'
+            });
+        }
+        
+        if (entity.burningTime && entity.burningTime > 0) {
+            statusBars.push({
+                type: 'burning',
+                config: STATUS_EFFECT_CONFIG.burning,
+                progress: Math.min(1, entity.burningTime / 300),
+                label: 'BURN',
+                value: Math.ceil(entity.burningTime / 60) + 's'
+            });
+        }
+        
+        if (entity.slowedTime && entity.slowedTime > 0) {
+            statusBars.push({
+                type: 'slowed',
+                config: STATUS_EFFECT_CONFIG.slowed,
+                progress: Math.min(1, entity.slowedTime / 180),
+                label: 'SLOW',
+                value: Math.ceil(entity.slowedTime / 60) + 's'
+            });
+        }
+        
+        if (entity.stunnedTime && entity.stunnedTime > 0) {
+            statusBars.push({
+                type: 'stunned',
+                config: STATUS_EFFECT_CONFIG.stunned,
+                progress: Math.min(1, entity.stunnedTime / 120),
+                label: 'STUN',
+                value: Math.ceil(entity.stunnedTime / 60) + 's'
+            });
+        }
+        
+        if (entity.magicShieldActive && entity.magicShieldHP > 0) {
+            const shieldProgress = entity.magicShieldHP / Math.max(1, entity.magicShieldMaxHP || 1);
+            statusBars.push({
+                type: 'magicShield',
+                config: STATUS_EFFECT_CONFIG.magicShield,
+                progress: shieldProgress,
+                label: 'M.SHIELD',
+                value: Math.ceil(entity.magicShieldHP)
+            });
+        }
+    }
+    
+    // If no status bars, still show entity label for player
+    if (statusBars.length === 0) {
+        if (entityType === 'player') {
+            const scaledLabelHeight = 12 * sizeScale;
+            const labelY = screenY - (45 * sizeScale) - scaledLabelHeight + (6 * sizeScale);
+            
+            CTX.save();
+            CTX.imageSmoothingEnabled = true;
+            if (CTX.imageSmoothingQuality) CTX.imageSmoothingQuality = 'high';
+            
+            const pulse = 1 + Math.sin(frame * 0.08) * 0.3 * 0.3;
+            const baseFontSize = 8 * sizeScale;
+            CTX.font = `bold ${Math.round(baseFontSize)}px Arial`;
+            CTX.textAlign = 'center';
+            CTX.textBaseline = 'middle';
+            
+            CTX.shadowColor = '#22c55e';
+            CTX.shadowBlur = 8 * pulse * sizeScale;
+            CTX.fillStyle = '#4ade80';
+            CTX.fillText('YOURS', screenX, labelY);
+            
+            CTX.shadowBlur = 4 * sizeScale;
+            CTX.fillStyle = '#ffffff';
+            CTX.globalAlpha = 0.7;
+            CTX.fillText('YOURS', screenX, labelY);
+            CTX.globalAlpha = 1;
+            CTX.shadowBlur = 0;
+            
+            CTX.restore();
+        }
+        return;
+    }
+    
+    // Reorder: HP always at bottom
+    const hpBar = statusBars.find(b => b.type === 'hp');
+    const otherBars = statusBars.filter(b => b.type !== 'hp');
+    const orderedBars = hpBar ? [hpBar, ...otherBars] : otherBars;
+    
+    // Calculate panel dimensions
+    const LABEL_HEIGHT = 12 * sizeScale;
+    const scaledBarHeight = BAR_HEIGHT;
+    const scaledBarGap = BAR_GAP;
+    const scaledPanelWidth = PANEL_WIDTH;
+    
+    const totalBarsHeight = orderedBars.length * (scaledBarHeight + scaledBarGap) - scaledBarGap;
+    const panelX = screenX - scaledPanelWidth / 2;
+    const panelY = screenY - (45 * sizeScale) - totalBarsHeight - LABEL_HEIGHT;
+    
+    CTX.save();
+    CTX.imageSmoothingEnabled = true;
+    if (CTX.imageSmoothingQuality) CTX.imageSmoothingQuality = 'high';
+    
+    // Entity type label
+    let entityLabel = '';
+    let labelColor = '#ffffff';
+    let glowColor = '#ffffff';
+    let pulseIntensity = 0;
+    
+    if (entityType === 'player') {
+        entityLabel = 'YOURS';
+        labelColor = '#4ade80';
+        glowColor = '#22c55e';
+        pulseIntensity = 0.3;
+    } else if (entityType === 'clone') {
+        entityLabel = 'ALLY';
+        labelColor = '#86efac';
+        glowColor = '#4ade80';
+        pulseIntensity = 0.2;
+    } else if (entityType === 'enemy') {
+        entityLabel = 'ENEMY';
+        labelColor = '#f87171';
+        glowColor = '#ef4444';
+        pulseIntensity = 0.4;
+    } else if (entityType === 'boss') {
+        entityLabel = 'BOSS';
+        labelColor = '#fbbf24';
+        glowColor = '#f59e0b';
+        pulseIntensity = 0.5;
+    }
+    
+    // Draw entity label
+    const labelY = panelY + (6 * sizeScale);
+    const pulse = 1 + Math.sin(frame * 0.08) * pulseIntensity * 0.3;
+    
+    const baseFontSize = 8 * sizeScale;
+    CTX.font = `bold ${Math.round(baseFontSize)}px Arial`;
+    CTX.textAlign = 'center';
+    CTX.textBaseline = 'middle';
+    
+    CTX.shadowColor = glowColor;
+    CTX.shadowBlur = 8 * pulse * sizeScale;
+    CTX.fillStyle = labelColor;
+    CTX.fillText(entityLabel, screenX, labelY);
+    
+    CTX.shadowBlur = 4 * sizeScale;
+    CTX.fillStyle = '#ffffff';
+    CTX.globalAlpha = 0.7;
+    CTX.fillText(entityLabel, screenX, labelY);
+    CTX.globalAlpha = 1;
+    CTX.shadowBlur = 0;
+    
+    // === ALERT INDICATOR (!) ===
+    // Draw dramatic animated (!) indicator when enemy is alerted
+    if (entityType === 'enemy' && entity.alertIndicator && entity.alertIndicator > 0) {
+        drawAlertIndicator(CTX, screenX, panelY - (12 * sizeScale), entity.alertIndicator, frame, sizeScale);
+    }
+    
+    // Draw each status bar
+    orderedBars.forEach((bar, index) => {
+        const barY = panelY + LABEL_HEIGHT + (orderedBars.length - 1 - index) * (scaledBarHeight + scaledBarGap);
+        drawStatusBarEnhanced(
+            CTX,
+            panelX,
+            barY,
+            scaledPanelWidth,
+            scaledBarHeight,
+            bar.progress,
+            bar.config,
+            bar.label,
+            bar.value,
+            frame,
+            bar.type === 'cursedBurn' || bar.type === 'burning' || bar.type === 'frozen' || bar.type === 'slowed' || bar.type === 'stunned',
+            sizeScale
+        );
+    });
+    
+    CTX.restore();
 }

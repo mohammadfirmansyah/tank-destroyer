@@ -154,6 +154,11 @@ function startGame() {
     // Show UI layer when game starts
     document.getElementById('ui-layer').classList.add('active');
     
+    // Restart game music from beginning (fresh start for deploy/restart)
+    if (typeof MusicManager !== 'undefined') {
+        MusicManager.restartGameMusic();
+    }
+    
     terrainNoiseOffsetX = Math.random() * 10000;
     terrainNoiseOffsetY = Math.random() * 10000;
 
@@ -286,11 +291,21 @@ function togglePause() {
         resetVirtualJoysticks();
         document.getElementById('pause-screen').classList.remove('hidden');
         if (typeof saveGame === 'function') saveGame();
+        
+        // Pause game music and play pause music
+        if (typeof MusicManager !== 'undefined') {
+            MusicManager.pauseGameMusic();
+        }
     }
     else {
         document.getElementById('pause-screen').classList.add('hidden');
         lastTime = performance.now();
         loop(performance.now());
+        
+        // Resume game music
+        if (typeof MusicManager !== 'undefined') {
+            MusicManager.resumeGameMusic();
+        }
     }
 }
 
@@ -301,6 +316,11 @@ function returnHome() {
         if (typeof saveGame === 'function') {
             saveGame();
         }
+    }
+    
+    // Play home music
+    if (typeof MusicManager !== 'undefined') {
+        MusicManager.play('home');
     }
     
     // Check if coming from victory screen for special exit animation
@@ -1158,9 +1178,12 @@ function update(dt) {
             aimAngle = mouseAim.angle;
             shouldFire = true;
             isActivelyAiming = true;
+        } else if (mouseAim.active) {
+            // Mouse cursor active = turret follows cursor direction (no fire)
+            // This allows turret to always track cursor for better aiming feedback
+            aimAngle = mouseAim.angle;
+            isActivelyAiming = true;
         }
-        // NOTE: Mouse movement without click no longer forces turret rotation
-        // This prevents turret from resetting to angle 0 when idle
     }
 
     // Track if player is manually aiming/firing BEFORE auto-aim kicks in
@@ -1821,6 +1844,12 @@ function update(dt) {
                 } else {
                     player.enemiesPerWave = getBaseEnemiesPerWave(player.currentWave);
                     player.totalEnemiesInWave = 0;
+                    
+                    // Track initial enemy count for patrol/alert system (50% threshold)
+                    if (typeof waveStartEnemyCount !== 'undefined') {
+                        waveStartEnemyCount = player.enemiesPerWave;
+                    }
+                    
                     addFloatText('WAVE ' + player.currentWave + ' START!', player.x, player.y - 80, '#00ff00');
                 }
             }
@@ -5147,6 +5176,11 @@ function endGame(fromDeath = false) {
         screen.classList.remove('hidden');
         if (fromDeath) screen.classList.add('mission-failed-enter');
         else screen.classList.remove('mission-failed-enter');
+
+        // Play failed music
+        if (typeof MusicManager !== 'undefined') {
+            MusicManager.play('failed');
+        }
 
         const gameCanvas = document.getElementById('gameCanvas');
         if (gameCanvas) gameCanvas.classList.remove('active');
