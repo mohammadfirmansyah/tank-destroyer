@@ -77,6 +77,18 @@ function loadGame() {
 		
         // Restore Player
         Object.assign(player, deserializePlayer(saveData.player));
+        
+        // CRITICAL: Force reset firing state after Object.assign to ensure clean state
+        // This is a safety net in case deserializePlayer doesn't fully override
+        player.fireDelay = 0;
+        player.overheated = false;
+        player.spawnWarmup = 0;
+        player.stunned = false;
+        player.stunnedTime = 0;
+        player.frozen = false;
+        player.frozenTime = 0;
+        player.recoilRecoveryTime = 0;
+        console.log('[loadGame] Player firing state reset - ready to shoot');
 		
         // Restore Globals
         score = saveData.score || 0;
@@ -318,6 +330,25 @@ function deserializePlayer(data) {
     clone.thermalLocked = false; // Reset thermal lock
     clone.consecutiveShots = 0;  // Reset shot counter
     clone.lastShotTime = 0;      // Reset last shot timestamp
+    
+    // CRITICAL: Reset spawn protection - player should be ready to fight immediately
+    clone.spawnWarmup = 0;       // No spawn warmup on load
+    clone.spawnWarmupMax = typeof SPAWN_WARMUP_FRAMES !== 'undefined' ? SPAWN_WARMUP_FRAMES : 120;
+    
+    // Reset status effects that could block actions
+    clone.stunned = false;
+    clone.stunnedTime = 0;
+    clone.frozen = false;
+    clone.frozenTime = 0;
+    clone.slowed = false;
+    clone.slowedTime = 0;
+    
+    // Reset recoil recovery that slows turret rotation
+    clone.recoilRecoveryTime = 0;
+    clone.recoilRecoveryTimeMax = 0;
+    
+    // Reset energy recharge delay
+    clone.rechargeDelay = 0;
     
     return clone;
 }

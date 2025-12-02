@@ -5,6 +5,37 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.7] - 2025-12-03
+
+### Fixed
+- 🔫 **Player Firing Bug After Continue/Load (Complete Fix)** - Critical save/load fix
+  - Player tank now properly fires immediately after loading saved game
+  - Added complete reset of all firing-blocking properties in `deserializePlayer()`
+  - Added safety net reset after `Object.assign()` in `loadGame()`
+  - Reset `spawnWarmup` to 0 - was blocking firing due to spawn protection
+  - Reset `stunned`, `stunnedTime`, `frozen`, `frozenTime` - status effects blocking actions
+  - Reset `recoilRecoveryTime` - was slowing turret rotation
+  - Reset `rechargeDelay` - was blocking energy regeneration
+  - Added console logging for debugging firing state
+
+### Technical
+- `js/saveManager.js`:
+  - `deserializePlayer()` now resets additional properties:
+    - `spawnWarmup: 0` - no spawn protection on load
+    - `stunned: false`, `stunnedTime: 0` - no stun effect
+    - `frozen: false`, `frozenTime: 0` - no freeze effect  
+    - `slowed: false`, `slowedTime: 0` - no slow effect
+    - `recoilRecoveryTime: 0`, `recoilRecoveryTimeMax: 0` - no turret lock
+    - `rechargeDelay: 0` - immediate energy regen
+  - `loadGame()` now explicitly resets firing state after `Object.assign()`
+  - Added `[loadGame] Player firing state reset` console log
+
+- `index.html`:
+  - Updated version number to v2.1.7
+
+- `js/cache-buster.js`:
+  - Updated `CACHE_BUSTER_VERSION` to v2.1.7
+
 ## [2.1.6] - 2025-12-03
 
 ### Fixed
