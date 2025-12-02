@@ -3442,6 +3442,96 @@ body.touch-controls-hidden .joystick-container {
 	z-index: 10;
 }
 
+.music-controls-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Music Start Hint - Dramatic Animation */
+.music-start-hint {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	background: linear-gradient(135deg, 
+		rgba(255, 200, 50, 0.25) 0%, 
+		rgba(255, 150, 0, 0.15) 100%);
+	border: 2px solid rgba(255, 200, 50, 0.6);
+	border-radius: 20px;
+	animation: hintPulse 2s ease-in-out infinite, hintGlow 1.5s ease-in-out infinite alternate;
+	box-shadow: 
+		0 0 15px rgba(255, 200, 50, 0.3),
+		0 0 30px rgba(255, 150, 0, 0.15),
+		inset 0 1px 0 rgba(255, 255, 255, 0.2);
+	transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+	user-select: none;
+	pointer-events: none;
+}
+
+.music-start-hint.hidden {
+	opacity: 0;
+	transform: translateX(-20px) scale(0.8);
+	pointer-events: none;
+}
+
+.hint-arrow {
+	font-size: 14px;
+	animation: arrowBounce 0.8s ease-in-out infinite;
+	filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.hint-text {
+	font-family: 'Rajdhani', sans-serif;
+	font-size: clamp(9px, 1.8vw, 12px);
+	font-weight: 600;
+	color: rgba(255, 230, 150, 0.95);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	text-shadow: 
+		0 1px 2px rgba(0, 0, 0, 0.5),
+		0 0 10px rgba(255, 200, 50, 0.3);
+	white-space: nowrap;
+}
+
+/* Dramatic Keyframe Animations */
+@keyframes hintPulse {
+	0%, 100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.05);
+		opacity: 0.9;
+	}
+}
+
+@keyframes hintGlow {
+	0% {
+		box-shadow: 
+			0 0 15px rgba(255, 200, 50, 0.3),
+			0 0 30px rgba(255, 150, 0, 0.15),
+			inset 0 1px 0 rgba(255, 255, 255, 0.2);
+		border-color: rgba(255, 200, 50, 0.6);
+	}
+	100% {
+		box-shadow: 
+			0 0 25px rgba(255, 200, 50, 0.5),
+			0 0 50px rgba(255, 150, 0, 0.25),
+			inset 0 1px 0 rgba(255, 255, 255, 0.3);
+		border-color: rgba(255, 220, 100, 0.8);
+	}
+}
+
+@keyframes arrowBounce {
+	0%, 100% {
+		transform: translateY(0) rotate(-15deg);
+	}
+	50% {
+		transform: translateY(-4px) rotate(-15deg);
+	}
+}
+
 .music-toggle {
 	display: flex;
 	align-items: center;

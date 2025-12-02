@@ -226,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Music toggle button - toggles music on/off with localStorage persistence
     const musicToggleBtn = document.getElementById('music-toggle');
     const musicIconEl = document.getElementById('music-icon');
+    const musicStartHint = document.getElementById('music-start-hint');
     
     if (musicToggleBtn && musicIconEl) {
         console.log('[Input] Music toggle button found, attaching handler');
@@ -234,6 +235,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const updateMusicIcon = (isEnabled) => {
             musicIconEl.textContent = isEnabled ? '🔊' : '🔇';
             musicToggleBtn.classList.toggle('disabled', !isEnabled);
+        };
+        
+        // Function to update music start hint visibility
+        // Show hint when: music not muted AND user hasn't interacted yet
+        const updateMusicStartHint = () => {
+            if (!musicStartHint) return;
+            
+            const hasInteracted = MusicManager.hasUserInteracted();
+            const isMusicEnabled = MusicManager.isEnabled();
+            
+            // Show hint only when music is enabled (not muted) but user hasn't interacted
+            const shouldShow = isMusicEnabled && !hasInteracted;
+            
+            if (shouldShow) {
+                musicStartHint.classList.remove('hidden');
+            } else {
+                musicStartHint.classList.add('hidden');
+            }
         };
         
         // Click handler with push-in animation
@@ -263,6 +282,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const isEnabled = MusicManager.toggle();
             updateMusicIcon(isEnabled);
             
+            // Update hint visibility after toggle
+            updateMusicStartHint();
+            
             console.log('[Input] Music toggled, enabled:', isEnabled);
         };
         
@@ -275,14 +297,27 @@ document.addEventListener('DOMContentLoaded', () => {
             handleMusicToggle(e);
         }, { passive: false });
         
-        // Initialize icon state after MusicManager is ready
+        // Initialize icon state and hint after MusicManager is ready
         setTimeout(() => {
             if (typeof MusicManager !== 'undefined') {
                 const isEnabled = MusicManager.isEnabled();
                 updateMusicIcon(isEnabled);
+                updateMusicStartHint();
                 console.log('[Input] Music icon initialized, enabled:', isEnabled);
             }
         }, 300);
+        
+        // Listen for user interaction to hide hint
+        // This catches any click/touch that triggers music playback
+        const hideHintOnInteraction = () => {
+            setTimeout(() => {
+                updateMusicStartHint();
+            }, 100);
+        };
+        
+        document.addEventListener('click', hideHintOnInteraction);
+        document.addEventListener('touchstart', hideHintOnInteraction);
+        document.addEventListener('keydown', hideHintOnInteraction);
     } else {
         console.warn('[Input] Music toggle button or icon not found');
     }

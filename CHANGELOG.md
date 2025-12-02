@@ -5,6 +5,26 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.7] - 2025-12-02
+
+### Added
+- 🎵 **Music Start Hint** - Visual prompt to help users start music playback
+  - Shows "Tap anywhere to start music" with animated arrow next to mute button
+  - Dramatic pulse, glow, and bounce animations for attention
+  - Golden/amber color scheme matching game aesthetics
+  - Auto-hides when: user interacts with screen OR music is muted
+  - Helps with browser autoplay policy (requires user interaction for audio)
+
+### Technical
+- `index.html`: Added `.music-start-hint` element with arrow and text
+- `css/style.css`: Added `.music-controls-row`, hint styling with keyframe animations
+  - `hintPulse` - Scale breathing animation (2s loop)
+  - `hintGlow` - Box-shadow glow animation (1.5s alternate)
+  - `arrowBounce` - Arrow bounce animation (0.8s loop)
+- `js/input.js`: Added `updateMusicStartHint()` function with interaction listeners
+
+---
+
 ## [2.0.6] - 2025-12-02
 
 ### Removed
