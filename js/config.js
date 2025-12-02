@@ -246,88 +246,110 @@ const DEBUG_SHOW_FPS = true;
 // Default: true (FPS limiter enabled)
 const DEBUG_FPS_LIMITER = false;
 
-// DEBUG_SMART_PERFORMANCE: When true, enables the Smart Performance Optimizer.
-// This system automatically detects FPS drops below 59 FPS and applies intelligent
-// optimizations to maintain stable frame rate without significantly affecting visuals.
-// Optimizations include: particle reduction, culling distance adjustment, effect simplification.
-// Useful for: Low-end devices, mobile browsers, maintaining 60 FPS target.
-// Default: true (Smart Performance enabled)
-const DEBUG_SMART_PERFORMANCE = true;
+// =============================================================================
+// GRAPHICS SETTINGS SYSTEM - User Configurable Quality Presets
+// =============================================================================
+// This replaces the old DEBUG_SMART_PERFORMANCE system with user-controllable settings.
+// Users can choose quality presets or customize individual settings.
+// Settings are persisted in localStorage for cross-session consistency.
+// DEFAULT: Lowest quality (level 5) for maximum compatibility
+// =============================================================================
+
+// Graphics quality level (0-5): 0=Ultra, 1=High, 2=Medium, 3=Low, 4=Very Low, 5=Lowest
+// Default is 5 (Lowest) for best compatibility across all devices
+let graphicsQualityLevel = 5;
+
+// Load graphics settings from localStorage on startup
+function loadGraphicsSettings() {
+    try {
+        const saved = localStorage.getItem('tankDestroyer_graphicsQuality');
+        if (saved !== null) {
+            const level = parseInt(saved, 10);
+            if (level >= 0 && level <= 5) {
+                graphicsQualityLevel = level;
+                console.log('[Graphics] Loaded quality level:', level, GRAPHICS_QUALITY_LEVELS[level].name);
+            }
+        } else {
+            // First time - default to lowest quality
+            graphicsQualityLevel = 5;
+            saveGraphicsSettings();
+            console.log('[Graphics] First run, defaulting to Lowest quality for compatibility');
+        }
+    } catch (e) {
+        console.warn('[Graphics] Could not load settings:', e);
+        graphicsQualityLevel = 5;
+    }
+}
+
+// Save graphics settings to localStorage
+function saveGraphicsSettings() {
+    try {
+        localStorage.setItem('tankDestroyer_graphicsQuality', graphicsQualityLevel.toString());
+    } catch (e) {
+        console.warn('[Graphics] Could not save settings:', e);
+    }
+}
+
+// Set graphics quality and apply immediately
+function setGraphicsQuality(level) {
+    if (level < 0 || level > 5) return;
+    
+    graphicsQualityLevel = level;
+    saveGraphicsSettings();
+    
+    // Apply smooth values immediately for instant feedback
+    const settings = GRAPHICS_QUALITY_LEVELS[level];
+    smoothPerfValues.particleMultiplier = settings.particleMultiplier;
+    smoothPerfValues.maxParticles = settings.maxParticles;
+    smoothPerfValues.cullDistance = settings.cullDistance;
+    smoothPerfValues.trailLength = settings.trailLength;
+    smoothPerfValues.effectDetail = settings.effectDetail;
+    smoothPerfValues.shadowQuality = settings.shadowQuality;
+    smoothPerfValues.terrainDetail = settings.terrainDetail;
+    smoothPerfValues.trackQuality = settings.trackQuality;
+    smoothPerfValues.wallDetail = settings.wallDetail;
+    smoothPerfValues.floatTextMax = settings.floatTextMax;
+    
+    console.log('[Graphics] Quality set to:', settings.name);
+    return settings;
+}
+
+// Get current graphics quality level
+function getGraphicsQuality() {
+    return graphicsQualityLevel;
+}
+
+// Get current graphics settings object
+function getGraphicsSettings() {
+    return GRAPHICS_QUALITY_LEVELS[graphicsQualityLevel] || GRAPHICS_QUALITY_LEVELS[5];
+}
 
 // =============================================================================
-// SMART PERFORMANCE OPTIMIZER SYSTEM - COMPREHENSIVE BOTTLENECK DETECTION
+// GRAPHICS QUALITY LEVELS - Comprehensive Visual Settings
 // =============================================================================
-// This system identifies and addresses ALL major sources of FPS drops:
+// This system controls ALL major rendering parameters for performance/quality balance:
 // 1. PARTICLES - Explosion effects, trails, sparks (GPU fill rate)
 // 2. TERRAIN - Background tiles with multiple layers (GPU overdraw)
 // 3. SHADOWS - blur() filters are VERY expensive on CPU/GPU
 // 4. TRACKS - Tank track bezier curves (CPU path calculations)
-// 5. ENEMIES - AI calculations, pathfinding (CPU heavy)
-// 6. BULLETS - Collision detection with walls/enemies (CPU)
-// 7. EFFECTS - Magic circles, auras, glows (GPU blending)
-// 8. WALLS/CRATES - Complex rendering with gradients (GPU)
+// 5. EFFECTS - Magic circles, auras, glows (GPU blending)
+// 6. WALLS/CRATES - Complex rendering with gradients (GPU)
 // =============================================================================
-
-// Performance optimizer state
-let smartPerfEnabled = DEBUG_SMART_PERFORMANCE;
-let smartPerfLevel = 0; // 0 = Full quality, 1-5 = Progressive optimization levels
-let smartPerfLastCheck = 0;
-let smartPerfCheckInterval = 400; // Check every 400ms (faster response)
-let smartPerfFPSHistory = [];
-let smartPerfHistorySize = 8; // Track last 8 FPS samples for faster response
-let smartPerfTargetFPS = 58; // Target FPS threshold (slightly below 60 for headroom)
-let smartPerfRecoveryFrames = 0; // Frames of good performance before recovering quality
-let smartPerfBottleneck = 'none'; // Current detected bottleneck type
 
 // Smooth transition values - lerp towards target for glitch-free quality changes
 let smoothPerfValues = {
-    particleMultiplier: 1.0,
-    maxParticles: 500,
-    cullDistance: 1500,
-    trailLength: 1.0,
-    effectDetail: 1.0,
-    shadowQuality: 1.0,
-    terrainDetail: 1.0,
-    trackQuality: 1.0,
-    wallDetail: 1.0
+    particleMultiplier: 0.15,  // Default to lowest quality values
+    maxParticles: 50,
+    cullDistance: 500,
+    trailLength: 0.1,
+    effectDetail: 0.2,
+    shadowQuality: 0,
+    terrainDetail: 0.1,
+    trackQuality: 0,
+    wallDetail: 0.3,
+    floatTextMax: 15  // Maximum floating texts allowed
 };
-const PERF_LERP_SPEED = 0.08; // How fast values transition when DECREASING quality
-const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING quality (instant feel)
-
-// Reset Smart Performance to full quality - call when starting new game
-// This ensures game always starts at highest graphics, not leftover degraded state
-function resetSmartPerformance() {
-    smartPerfLevel = 0;
-    smartPerfRecoveryFrames = 0;
-    smartPerfFPSHistory = [];
-    smartPerfBottleneck = 'none';
-    
-    // CRITICAL: Reset smooth values to FULL QUALITY immediately (no lerp)
-    // This prevents starting game with degraded graphics from previous session/demo
-    const fullQuality = SMART_PERF_LEVELS[0];
-    smoothPerfValues.particleMultiplier = fullQuality.particleMultiplier;
-    smoothPerfValues.maxParticles = fullQuality.maxParticles;
-    smoothPerfValues.cullDistance = fullQuality.cullDistance;
-    smoothPerfValues.trailLength = fullQuality.trailLength;
-    smoothPerfValues.effectDetail = fullQuality.effectDetail;
-    smoothPerfValues.shadowQuality = fullQuality.shadowQuality;
-    smoothPerfValues.terrainDetail = fullQuality.terrainDetail;
-    smoothPerfValues.trackQuality = fullQuality.trackQuality;
-    smoothPerfValues.wallDetail = fullQuality.wallDetail;
-    
-    // Reset metrics
-    smartPerfMetrics = {
-        particleCount: 0,
-        enemyCount: 0,
-        bulletCount: 0,
-        trackCount: 0,
-        wallCount: 0,
-        effectCount: 0,
-        sampleCount: 0
-    };
-    
-    console.log('[SmartPerf] Reset to full quality for new game');
-}
+const PERF_LERP_SPEED = 0.15; // How fast values transition
 
 // Linear interpolation helper
 function lerpValue(current, target, speed) {
@@ -336,379 +358,189 @@ function lerpValue(current, target, speed) {
     return current + diff * speed;
 }
 
-// Update smooth performance values - call every frame
-// Uses FAST lerp when recovering quality, SLOW lerp when degrading
-function updateSmoothPerfValues() {
-    if (!DEBUG_SMART_PERFORMANCE) return;
-    
-    const target = getSmartPerfSettings();
-    
-    // Use FAST speed when recovering to full quality (target is higher than current)
-    // Use SLOW speed when degrading quality (target is lower than current)
-    const isRecovering = smartPerfLevel === 0;
-    const speed = isRecovering ? PERF_LERP_SPEED_RECOVERY : PERF_LERP_SPEED;
-    
-    smoothPerfValues.particleMultiplier = lerpValue(smoothPerfValues.particleMultiplier, target.particleMultiplier, speed);
-    smoothPerfValues.maxParticles = (lerpValue(smoothPerfValues.maxParticles, target.maxParticles, speed) + 0.5) | 0;
-    smoothPerfValues.cullDistance = lerpValue(smoothPerfValues.cullDistance, target.cullDistance, speed);
-    smoothPerfValues.trailLength = lerpValue(smoothPerfValues.trailLength, target.trailLength, speed);
-    smoothPerfValues.effectDetail = lerpValue(smoothPerfValues.effectDetail, target.effectDetail, speed);
-    smoothPerfValues.shadowQuality = lerpValue(smoothPerfValues.shadowQuality, target.shadowQuality, speed);
-    smoothPerfValues.terrainDetail = lerpValue(smoothPerfValues.terrainDetail, target.terrainDetail, speed);
-    smoothPerfValues.trackQuality = lerpValue(smoothPerfValues.trackQuality, target.trackQuality, speed);
-    smoothPerfValues.wallDetail = lerpValue(smoothPerfValues.wallDetail, target.wallDetail, speed);
-}
-
-// Bottleneck detection counters (accumulated over check interval)
-let smartPerfMetrics = {
-    particleCount: 0,
-    enemyCount: 0,
-    bulletCount: 0,
-    trackCount: 0,
-    wallCount: 0,
-    effectCount: 0,
-    sampleCount: 0
-};
-
-// Update metrics each frame for bottleneck detection
-function updatePerfMetrics() {
-    if (!DEBUG_SMART_PERFORMANCE) return;
-    
-    // Safely get counts from game state
-    smartPerfMetrics.particleCount += (typeof particles !== 'undefined' ? particles.length : 0);
-    smartPerfMetrics.enemyCount += (typeof enemies !== 'undefined' ? enemies.filter(e => e.hp > 0).length : 0);
-    smartPerfMetrics.bulletCount += (typeof bullets !== 'undefined' ? bullets.length : 0);
-    smartPerfMetrics.trackCount += (typeof enemyTracks !== 'undefined' ? enemyTracks.length : 0);
-    smartPerfMetrics.wallCount += (typeof walls !== 'undefined' ? walls.length : 0);
-    smartPerfMetrics.effectCount += (typeof magicEffects !== 'undefined' ? magicEffects.length : 0);
-    smartPerfMetrics.sampleCount++;
-}
-
-// Detect primary bottleneck based on metrics
-function detectBottleneck() {
-    if (smartPerfMetrics.sampleCount === 0) return 'unknown';
-    
-    const avgParticles = smartPerfMetrics.particleCount / smartPerfMetrics.sampleCount;
-    const avgEnemies = smartPerfMetrics.enemyCount / smartPerfMetrics.sampleCount;
-    const avgBullets = smartPerfMetrics.bulletCount / smartPerfMetrics.sampleCount;
-    const avgTracks = smartPerfMetrics.trackCount / smartPerfMetrics.sampleCount;
-    const avgEffects = smartPerfMetrics.effectCount / smartPerfMetrics.sampleCount;
-    
-    // Thresholds for each bottleneck type
-    // Lower thresholds = earlier detection
-    const thresholds = {
-        particles: 150,  // Particles are expensive (GPU fill)
-        enemies: 15,     // AI calculations are expensive (CPU)
-        bullets: 50,     // Collision detection (CPU)
-        tracks: 200,     // Bezier curve rendering (CPU/GPU)
-        effects: 10      // Magic effects with blending (GPU)
-    };
-    
-    // Calculate "pressure" for each system (0-1 scale)
-    const pressures = {
-        particles: avgParticles / thresholds.particles,
-        enemies: avgEnemies / thresholds.enemies,
-        bullets: avgBullets / thresholds.bullets,
-        tracks: avgTracks / thresholds.tracks,
-        effects: avgEffects / thresholds.effects,
-        // Shadows/terrain are always potential bottlenecks
-        rendering: 0.5 // Base rendering pressure
-    };
-    
-    // Find highest pressure
-    let maxPressure = 0;
-    let bottleneck = 'rendering';
-    
-    for (const [type, pressure] of Object.entries(pressures)) {
-        if (pressure > maxPressure) {
-            maxPressure = pressure;
-            bottleneck = type;
-        }
-    }
-    
-    return bottleneck;
-}
-
-// Optimization settings per level (higher = more aggressive)
-// Now includes ALL performance-affecting settings
-const SMART_PERF_LEVELS = {
-    0: { // Full quality - no optimizations (Ultra Graphics)
+// Graphics quality levels - 6 presets from Ultra to Lowest
+const GRAPHICS_QUALITY_LEVELS = {
+    0: { // Ultra Quality - Maximum visual fidelity
+        name: 'ULTRA',
         particleMultiplier: 1.0,
         maxParticles: 500,
         cullDistance: 1500,
         trailLength: 1.0,
         effectDetail: 1.0,
-        shadowQuality: 1.0,      // Full shadow blur
-        terrainDetail: 1.0,     // All terrain details
-        trackQuality: 1.0,      // Full bezier curves
-        wallDetail: 1.0,        // Full wall rendering
-        aiUpdateRate: 1,        // Update AI every frame
-        description: 'Ultra Quality'
+        shadowQuality: 1.0,
+        terrainDetail: 1.0,
+        trackQuality: 1.0,
+        wallDetail: 1.0,
+        aiUpdateRate: 1,
+        floatTextMax: 100,  // Maximum floating texts on screen
+        description: 'Maximum visual quality with all effects enabled'
     },
-    1: { // Slight reduction - High quality
+    1: { // High Quality
+        name: 'HIGH',
         particleMultiplier: 0.85,
         maxParticles: 350,
         cullDistance: 1300,
         trailLength: 0.85,
         effectDetail: 0.9,
-        shadowQuality: 0.8,     // Reduced blur radius
-        terrainDetail: 0.9,     // Skip some grass blades
-        trackQuality: 0.9,      // Slightly simpler curves
-        wallDetail: 0.95,       // Slightly less detail
-        aiUpdateRate: 1,        // Still every frame
-        description: 'High Quality'
+        shadowQuality: 0.8,
+        terrainDetail: 0.9,
+        trackQuality: 0.9,
+        wallDetail: 0.95,
+        aiUpdateRate: 1,
+        floatTextMax: 80,
+        description: 'High quality with minor optimizations'
     },
-    2: { // Moderate reduction - minor visual difference
+    2: { // Medium Quality
+        name: 'MEDIUM',
         particleMultiplier: 0.65,
         maxParticles: 250,
         cullDistance: 1100,
         trailLength: 0.7,
         effectDetail: 0.75,
-        shadowQuality: 0.5,     // Low blur
-        terrainDetail: 0.7,     // Skip pebbles & grass
-        trackQuality: 0.7,      // Simpler curves
-        wallDetail: 0.8,        // Skip some details
-        aiUpdateRate: 2,        // Update AI every 2 frames
-        description: 'Medium Quality'
+        shadowQuality: 0.5,
+        terrainDetail: 0.7,
+        trackQuality: 0.7,
+        wallDetail: 0.8,
+        aiUpdateRate: 2,
+        floatTextMax: 60,
+        description: 'Balanced quality and performance'
     },
-    3: { // Significant reduction - noticeable but playable
+    3: { // Low Quality
+        name: 'LOW',
         particleMultiplier: 0.45,
         maxParticles: 150,
         cullDistance: 900,
         trailLength: 0.5,
         effectDetail: 0.5,
-        shadowQuality: 0.3,     // Minimal blur
-        terrainDetail: 0.5,     // Basic terrain only
-        trackQuality: 0.5,      // Simple lines
-        wallDetail: 0.6,        // Basic walls
-        aiUpdateRate: 2,        // Every 2 frames
-        description: 'Low Quality'
+        shadowQuality: 0.3,
+        terrainDetail: 0.5,
+        trackQuality: 0.5,
+        wallDetail: 0.6,
+        aiUpdateRate: 2,
+        floatTextMax: 40,
+        description: 'Reduced quality for better performance'
     },
-    4: { // Heavy reduction - performance priority
+    4: { // Very Low Quality
+        name: 'VERY LOW',
         particleMultiplier: 0.3,
         maxParticles: 100,
         cullDistance: 700,
         trailLength: 0.3,
         effectDetail: 0.3,
-        shadowQuality: 0.1,     // Almost no blur
-        terrainDetail: 0.3,     // Flat colors only
-        trackQuality: 0.3,      // Straight lines
-        wallDetail: 0.4,        // Very basic
-        aiUpdateRate: 3,        // Every 3 frames
-        description: 'Very Low Quality'
+        shadowQuality: 0.1,
+        terrainDetail: 0.3,
+        trackQuality: 0.3,
+        wallDetail: 0.4,
+        aiUpdateRate: 3,
+        floatTextMax: 25,
+        description: 'Minimum visuals for performance priority'
     },
-    5: { // Emergency mode - maximum performance
+    5: { // Lowest Quality - Maximum Performance
+        name: 'LOWEST',
         particleMultiplier: 0.15,
         maxParticles: 50,
         cullDistance: 500,
         trailLength: 0.1,
         effectDetail: 0.2,
-        shadowQuality: 0,       // No blur at all
-        terrainDetail: 0.1,     // Solid colors
-        trackQuality: 0,        // No tracks
-        wallDetail: 0.3,        // Minimal
-        aiUpdateRate: 4,        // Every 4 frames
-        description: 'Emergency Mode'
+        shadowQuality: 0,
+        terrainDetail: 0.1,
+        trackQuality: 0,
+        wallDetail: 0.3,
+        aiUpdateRate: 4,
+        floatTextMax: 15,  // Minimal floating texts for max FPS
+        description: 'Fastest performance for low-end devices'
     }
 };
 
-// Get current performance settings based on optimization level
-function getSmartPerfSettings() {
-    return SMART_PERF_LEVELS[smartPerfLevel] || SMART_PERF_LEVELS[0];
+// Initialize graphics settings on load
+function initGraphicsSettings() {
+    loadGraphicsSettings();
+    // Apply current settings immediately
+    const settings = GRAPHICS_QUALITY_LEVELS[graphicsQualityLevel];
+    smoothPerfValues.particleMultiplier = settings.particleMultiplier;
+    smoothPerfValues.maxParticles = settings.maxParticles;
+    smoothPerfValues.cullDistance = settings.cullDistance;
+    smoothPerfValues.trailLength = settings.trailLength;
+    smoothPerfValues.effectDetail = settings.effectDetail;
+    smoothPerfValues.shadowQuality = settings.shadowQuality;
+    smoothPerfValues.terrainDetail = settings.terrainDetail;
+    smoothPerfValues.trackQuality = settings.trackQuality;
+    smoothPerfValues.wallDetail = settings.wallDetail;
+    smoothPerfValues.floatTextMax = settings.floatTextMax;
+    console.log('[Graphics] Initialized with quality:', settings.name);
 }
 
-// Update Smart Performance Optimizer - call every 30 frames from game loop
-function updateSmartPerformance(currentFPS) {
-    if (!DEBUG_SMART_PERFORMANCE) return;
+// Update smooth performance values - call every frame for smooth transitions
+function updateSmoothPerfValues() {
+    const target = GRAPHICS_QUALITY_LEVELS[graphicsQualityLevel];
+    if (!target) return;
     
-    const now = performance.now();
-    
-    // Accumulate metrics for bottleneck detection
-    updatePerfMetrics();
-    
-    // Only check at intervals to avoid overhead
-    if (now - smartPerfLastCheck < smartPerfCheckInterval) return;
-    smartPerfLastCheck = now;
-    
-    // Detect current bottleneck
-    smartPerfBottleneck = detectBottleneck();
-    
-    // Reset metrics for next interval
-    smartPerfMetrics = {
-        particleCount: 0,
-        enemyCount: 0,
-        bulletCount: 0,
-        trackCount: 0,
-        wallCount: 0,
-        effectCount: 0,
-        sampleCount: 0
-    };
-    
-    // Add current FPS to history
-    smartPerfFPSHistory.push(currentFPS);
-    if (smartPerfFPSHistory.length > smartPerfHistorySize) {
-        smartPerfFPSHistory.shift();
-    }
-    
-    // Need enough samples to make decisions
-    if (smartPerfFPSHistory.length < 4) return;
-    
-    // Calculate average FPS over recent history
-    const avgFPS = smartPerfFPSHistory.reduce((a, b) => a + b, 0) / smartPerfFPSHistory.length;
-    const minFPS = Math.min(...smartPerfFPSHistory);
-    
-    // Threshold: Graphics ONLY compromise when FPS drops BELOW 59
-    // Recovery: IMMEDIATE full quality when FPS is 59 or above
-    const fullQualityFPS = 59;    // >= 59 FPS = full quality (level 0)
-    const criticalFPS = 45;       // < 45 FPS = critical (jump multiple levels)
-    const warningFPS = 52;        // < 52 FPS = warning (increase 1 level)
-    
-    // PRIORITY 1: Immediate recovery when FPS >= 59
-    if (avgFPS >= fullQualityFPS && minFPS >= fullQualityFPS - 2) {
-        // FPS is 59+ - IMMEDIATELY restore full quality
-        if (smartPerfLevel > 0) {
-            smartPerfLevel = 0; // Instant recovery to full quality
-            smartPerfRecoveryFrames = 0;
-            if (DEBUG_SHOW_FPS) {
-                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0`);
-            }
-        }
-        return;
-    }
-    
-    // PRIORITY 2: Only optimize when FPS is BELOW 59
-    if (avgFPS < fullQualityFPS || minFPS < fullQualityFPS - 3) {
-        // FPS dropped below 59 - start compromising graphics
-        
-        if (minFPS < criticalFPS || avgFPS < criticalFPS) {
-            // CRITICAL: FPS very low, jump multiple levels
-            smartPerfRecoveryFrames = 0;
-            const levelsToJump = Math.min(2, 5 - smartPerfLevel);
-            if (levelsToJump > 0) {
-                smartPerfLevel += levelsToJump;
-                if (DEBUG_SHOW_FPS) {
-                    const settings = getSmartPerfSettings();
-                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description}`);
-                }
-            }
-        } else if (minFPS < warningFPS || avgFPS < warningFPS) {
-            // WARNING: FPS moderately low, increase 1 level
-            smartPerfRecoveryFrames = 0;
-            if (smartPerfLevel < 5) {
-                smartPerfLevel++;
-                if (DEBUG_SHOW_FPS) {
-                    const settings = getSmartPerfSettings();
-                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description}`);
-                }
-            }
-        } else {
-            // FPS between 52-58: mild optimization, try gradual recovery
-            smartPerfRecoveryFrames++;
-            
-            // Gradual recovery if FPS stabilizing in mid-range
-            if (smartPerfRecoveryFrames >= 3 && smartPerfLevel > 1) {
-                smartPerfLevel--;
-                smartPerfRecoveryFrames = 0;
-                if (DEBUG_SHOW_FPS) {
-                    const settings = getSmartPerfSettings();
-                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel}`);
-                }
-            }
-        }
-    }
+    smoothPerfValues.particleMultiplier = lerpValue(smoothPerfValues.particleMultiplier, target.particleMultiplier, PERF_LERP_SPEED);
+    smoothPerfValues.maxParticles = (lerpValue(smoothPerfValues.maxParticles, target.maxParticles, PERF_LERP_SPEED) + 0.5) | 0;
+    smoothPerfValues.cullDistance = lerpValue(smoothPerfValues.cullDistance, target.cullDistance, PERF_LERP_SPEED);
+    smoothPerfValues.trailLength = lerpValue(smoothPerfValues.trailLength, target.trailLength, PERF_LERP_SPEED);
+    smoothPerfValues.effectDetail = lerpValue(smoothPerfValues.effectDetail, target.effectDetail, PERF_LERP_SPEED);
+    smoothPerfValues.shadowQuality = lerpValue(smoothPerfValues.shadowQuality, target.shadowQuality, PERF_LERP_SPEED);
+    smoothPerfValues.terrainDetail = lerpValue(smoothPerfValues.terrainDetail, target.terrainDetail, PERF_LERP_SPEED);
+    smoothPerfValues.trackQuality = lerpValue(smoothPerfValues.trackQuality, target.trackQuality, PERF_LERP_SPEED);
+    smoothPerfValues.wallDetail = lerpValue(smoothPerfValues.wallDetail, target.wallDetail, PERF_LERP_SPEED);
+    smoothPerfValues.floatTextMax = (lerpValue(smoothPerfValues.floatTextMax, target.floatTextMax, PERF_LERP_SPEED) + 0.5) | 0;
 }
 
-// === PERFORMANCE GETTER FUNCTIONS ===
-// Used by rendering code to get current optimization settings
-// Now returns smoothly interpolated values for glitch-free transitions
+// === GRAPHICS GETTER FUNCTIONS ===
+// Used by rendering code to get current settings
 
-// Get particle count multiplier based on current optimization level
 function getParticleMultiplier() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.particleMultiplier;
 }
 
-// Get max particles limit based on current optimization level
 function getMaxParticles() {
-    if (!DEBUG_SMART_PERFORMANCE) return 500;
     return smoothPerfValues.maxParticles;
 }
 
-// Get cull distance based on current optimization level
 function getCullDistance() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1500;
     return smoothPerfValues.cullDistance;
 }
 
-// Get shadow quality (0 = no blur, 1 = full blur)
 function getShadowQuality() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.shadowQuality;
 }
 
-// Get terrain detail level (0 = solid colors, 1 = full detail)
 function getTerrainDetail() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.terrainDetail;
 }
 
-// Get track rendering quality (0 = no tracks, 1 = full bezier curves)
 function getTrackQuality() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.trackQuality;
 }
 
-// Get wall detail level
 function getWallDetail() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.wallDetail;
 }
 
-// Get AI update rate (1 = every frame, 2 = every 2 frames, etc)
 function getAIUpdateRate() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1;
-    return getSmartPerfSettings().aiUpdateRate; // AI rate doesn't need smoothing
+    return GRAPHICS_QUALITY_LEVELS[graphicsQualityLevel].aiUpdateRate;
 }
 
-// Get effect detail level (magic circles, auras, etc)
 function getEffectDetail() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.effectDetail;
 }
 
-// Get trail length multiplier
 function getTrailLength() {
-    if (!DEBUG_SMART_PERFORMANCE) return 1.0;
     return smoothPerfValues.trailLength;
 }
 
-// Console access for debugging
-function getPerfStatus() {
-    return {
-        enabled: DEBUG_SMART_PERFORMANCE,
-        level: smartPerfLevel,
-        description: getSmartPerfSettings().description,
-        bottleneck: smartPerfBottleneck,
-        settings: getSmartPerfSettings(),
-        fpsHistory: smartPerfFPSHistory,
-        avgFPS: smartPerfFPSHistory.length > 0 
-            ? (smartPerfFPSHistory.reduce((a, b) => a + b, 0) / smartPerfFPSHistory.length).toFixed(1)
-            : 'N/A'
-    };
+function getFloatTextMax() {
+    return smoothPerfValues.floatTextMax;
 }
 
-// Global access for console debugging
-if (typeof window !== 'undefined') {
-    window.TankDestroyer = window.TankDestroyer || {};
-    window.TankDestroyer.perfStatus = getPerfStatus;
-    window.TankDestroyer.setPerfLevel = (level) => {
-        smartPerfLevel = Math.max(0, Math.min(5, level));
-        const settings = getSmartPerfSettings();
-        const resW = Math.round(displayWidth * settings.resolutionScale);
-        const resH = Math.round(displayHeight * settings.resolutionScale);
-        console.log(`[SmartPerf] Manual level set: ${smartPerfLevel} - ${settings.description} | Resolution: ${resW}×${resH} (${Math.round(settings.resolutionScale * 100)}%)`);
-    };
-}
+// Legacy compatibility - smartPerfLevel now maps to graphicsQualityLevel
+let smartPerfLevel = 5; // Default to lowest for compatibility
+Object.defineProperty(window, 'smartPerfLevel', {
+    get: function() { return graphicsQualityLevel; },
+    set: function(v) { graphicsQualityLevel = v; }
+});
+
 
 // =============================================================================
 // FPS COUNTER SYSTEM (Canvas-based HUD - only renders during gameplay)

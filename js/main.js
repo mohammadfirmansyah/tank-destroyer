@@ -98,16 +98,15 @@ initializeGame();
     const benchMs = document.getElementById('bench-ms');
     const benchResolution = document.getElementById('bench-resolution');
     const benchQualityBadge = document.getElementById('bench-quality-badge');
-    const benchQualityLevel = document.getElementById('bench-quality-level');
     
-    // Quality names mapping - matches SMART_PERF_LEVELS descriptions
+    // Quality names mapping - matches GRAPHICS_QUALITY_LEVELS
     const QUALITY_NAMES = {
         0: { name: 'ULTRA', class: 'quality-ultra' },
         1: { name: 'HIGH', class: 'quality-high' },
         2: { name: 'MEDIUM', class: 'quality-medium' },
         3: { name: 'LOW', class: 'quality-low' },
         4: { name: 'VERY LOW', class: 'quality-verylow' },
-        5: { name: 'EMERGENCY', class: 'quality-emergency' }
+        5: { name: 'LOWEST', class: 'quality-emergency' }
     };
     
     // Benchmark tracking variables
@@ -202,9 +201,9 @@ initializeGame();
             if (benchMax) benchMax.textContent = benchMaxFps;
             if (benchMs) benchMs.textContent = frameTimeMs;
             
-            // Update quality badge and level
-            const qualityLevel = (typeof smartPerfLevel !== 'undefined') ? smartPerfLevel : 0;
-            const qualityInfo = QUALITY_NAMES[qualityLevel] || QUALITY_NAMES[0];
+            // Update quality badge based on user's graphics settings
+            const qualityLevel = (typeof graphicsQualityLevel !== 'undefined') ? graphicsQualityLevel : 5;
+            const qualityInfo = QUALITY_NAMES[qualityLevel] || QUALITY_NAMES[5];
             
             if (benchQualityBadge) {
                 benchQualityBadge.textContent = qualityInfo.name;
@@ -212,26 +211,13 @@ initializeGame();
                 benchQualityBadge.classList.remove('quality-ultra', 'quality-high', 'quality-medium', 'quality-low', 'quality-verylow', 'quality-emergency');
                 benchQualityBadge.classList.add(qualityInfo.class);
             }
-            if (benchQualityLevel) {
-                benchQualityLevel.textContent = `Level ${qualityLevel}`;
-            }
             
-            // Update resolution info - show TARGET resolution based on quality level
+            // Update resolution info - always 100% (no resolution scaling)
             if (benchResolution) {
-                // Check if resolution scaling is enabled via debug flag
-                const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-                
-                // Get target resolution scale from SMART_PERF_LEVELS based on current quality level
-                // When DEBUG_ENABLE_RESOLUTION_SCALING is false, always show 100%
-                const targetScales = [1.0, 0.95, 0.85, 0.75, 0.65, 0.5]; // Level 0-5
-                const targetScale = resScalingEnabled ? (targetScales[qualityLevel] || 1.0) : 1.0;
-                
                 const dispW = (typeof displayWidth !== 'undefined') ? displayWidth : window.innerWidth;
                 const dispH = (typeof displayHeight !== 'undefined') ? displayHeight : window.innerHeight;
-                const targetW = Math.round(dispW * targetScale);
-                const targetH = Math.round(dispH * targetScale);
                 
-                benchResolution.textContent = `${targetW} × ${targetH} (${Math.round(targetScale * 100)}%)`;
+                benchResolution.textContent = `${dispW} × ${dispH} (100%)`;
             }
             
             // Reset counters

@@ -371,6 +371,7 @@ function createEnemyFromSave(data) {
         maxHp: data.maxHp || tier.hp,
         radius: data.radius || 25,
         speed: data.speed || tier.speed,
+        baseSpeed: data.baseSpeed || tier.speed,
         angle: data.angle || 0,
         turretAngle: data.turretAngle || 0,
         cooldown: typeof data.cooldown === 'number' ? data.cooldown : 100,
@@ -381,6 +382,7 @@ function createEnemyFromSave(data) {
         hitFlash: data.hitFlash || 0,
         weapon: data.weapon || tier.weapon,
         id: tierId,
+        tierId: tierId,
         stuckTimer: data.stuckTimer || 0,
         home: data.home || { x: data.x, y: data.y },
         guardPoint: data.guardPoint || { x: data.x, y: data.y },
@@ -402,7 +404,33 @@ function createEnemyFromSave(data) {
         turretErrorTarget: safeNumber(data.turretErrorTarget, 0),
         turretErrorTimer: safeNumber(data.turretErrorTimer, 0),
         unstuck: data.unstuck ? { angle: safeNumber(data.unstuck.angle, 0), ttl: safeNumber(data.unstuck.ttl, 0) } : null,
-        lastTrackAngle: typeof data.lastTrackAngle === 'number' ? data.lastTrackAngle : (data.angle || 0)
+        lastTrackAngle: typeof data.lastTrackAngle === 'number' ? data.lastTrackAngle : (data.angle || 0),
+        
+        // === CRITICAL: AI STATE FOR SHOOTING ===
+        // Set to 'alerted' so enemies can shoot immediately on continue
+        // Without this, enemies would be stuck in 'patrol' mode unable to fire
+        aiState: 'alerted',
+        alertedReason: 'continue_game',
+        alertShootDelay: 0, // No delay - can shoot immediately
+        alertIndicator: 0,
+        
+        // === WHEEL AND TURRET VISUALS ===
+        wheelRotation: data.wheelRotation || 0,
+        turretRecoilOffsetX: 0,
+        turretRecoilOffsetY: 0,
+        turretRecoilDecay: 0.70,
+        recoilRecoveryTime: 0,
+        
+        // === SPAWN PROTECTION ===
+        spawnWarmup: 0, // No spawn protection on load - ready to fight
+        spawnWarmupMax: typeof SPAWN_WARMUP_FRAMES !== 'undefined' ? SPAWN_WARMUP_FRAMES : 120,
+        spawnHoldoff: 0, // Can be targeted immediately
+        
+        // === PATROL STATE (for reference, even though alerted) ===
+        patrolSpeedMult: 0.25,
+        visionAlertRange: 400,
+        visionAlertAngle: Math.PI / 4,
+        lastKnownPlayerPos: typeof player !== 'undefined' && player ? { x: player.x, y: player.y } : null
     };
 }
 

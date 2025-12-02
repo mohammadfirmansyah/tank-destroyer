@@ -190,20 +190,26 @@
         </div>
         
         <!-- Version Number -->
-        <div class="version-number">v2.0.7</div>
+        <div class="version-number">v2.1.1</div>
         
         <!-- Music Credits & Toggle (Bottom Left) -->
         <div class="music-credits">
             <div class="music-controls-row">
+                <div class="settings-btn" id="settings-btn" title="Graphics Settings">
+                    <span class="settings-icon">⚙️</span>
+                </div>
                 <div class="music-toggle" id="music-toggle" title="Toggle Music">
                     <span class="music-icon" id="music-icon">🔊</span>
                 </div>
-                <div class="music-start-hint" id="music-start-hint">
-                    <span class="hint-arrow">👆</span>
-                    <span class="hint-text">Tap anywhere to start music</span>
-                </div>
             </div>
             <div class="music-text">Music from Army Men RTS (2002) OST</div>
+        </div>
+        
+        <!-- Music Start Hint - Centered horizontally -->
+        <div class="music-start-hint-container" id="music-start-hint">
+            <div class="music-start-hint-box">
+                <span class="hint-text">Tap anywhere to start music</span>
+            </div>
         </div>
     </div>
     
@@ -212,8 +218,7 @@
         <div class="benchmark-header">
             <div class="benchmark-title">BENCHMARK MODE</div>
             <div class="benchmark-quality">
-                <span class="quality-badge" id="bench-quality-badge">ULTRA</span>
-                <span class="quality-level" id="bench-quality-level">Level 0</span>
+                <span class="quality-badge" id="bench-quality-badge">LOWEST</span>
             </div>
         </div>
         <div class="benchmark-stats">
@@ -255,6 +260,92 @@
         </div>
 
         <button id="ach-back-btn">BACK TO BASE</button>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="hidden">
+        <div class="settings-container">
+            <div class="settings-header">
+                <h1 class="settings-title">GRAPHICS SETTINGS</h1>
+                <div class="settings-subtitle">Optimize for your device</div>
+            </div>
+            
+            <div class="settings-content">
+                <!-- Quality Presets -->
+                <div class="settings-section">
+                    <div class="section-title">QUALITY PRESET</div>
+                    <div class="quality-presets">
+                        <button class="preset-btn" data-quality="0">
+                            <span class="preset-icon">💎</span>
+                            <span class="preset-name">ULTRA</span>
+                            <span class="preset-desc">Maximum quality</span>
+                        </button>
+                        <button class="preset-btn" data-quality="1">
+                            <span class="preset-icon">✨</span>
+                            <span class="preset-name">HIGH</span>
+                            <span class="preset-desc">Great visuals</span>
+                        </button>
+                        <button class="preset-btn" data-quality="2">
+                            <span class="preset-icon">⚖️</span>
+                            <span class="preset-name">MEDIUM</span>
+                            <span class="preset-desc">Balanced</span>
+                        </button>
+                        <button class="preset-btn" data-quality="3">
+                            <span class="preset-icon">🔋</span>
+                            <span class="preset-name">LOW</span>
+                            <span class="preset-desc">Better FPS</span>
+                        </button>
+                        <button class="preset-btn" data-quality="4">
+                            <span class="preset-icon">⚡</span>
+                            <span class="preset-name">VERY LOW</span>
+                            <span class="preset-desc">Performance</span>
+                        </button>
+                        <button class="preset-btn active" data-quality="5">
+                            <span class="preset-icon">🚀</span>
+                            <span class="preset-name">LOWEST</span>
+                            <span class="preset-desc">Max FPS</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Current Settings Display -->
+                <div class="settings-section">
+                    <div class="section-title">CURRENT SETTINGS</div>
+                    <div class="settings-info">
+                        <div class="setting-row">
+                            <span class="setting-label">Particles</span>
+                            <span class="setting-value" id="setting-particles">15%</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Shadows</span>
+                            <span class="setting-value" id="setting-shadows">Off</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Terrain Detail</span>
+                            <span class="setting-value" id="setting-terrain">10%</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Effects</span>
+                            <span class="setting-value" id="setting-effects">20%</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Tank Tracks</span>
+                            <span class="setting-value" id="setting-tracks">Off</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Floating Text</span>
+                            <span class="setting-value" id="setting-floattext">15 max</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">AI Update Rate</span>
+                            <span class="setting-value" id="setting-ai">Every 4 frames</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="settings-back-btn" class="settings-back-btn">APPLY & CLOSE</button>
+        </div>
     </div>
 
     <div id="pause-screen" class="hidden">

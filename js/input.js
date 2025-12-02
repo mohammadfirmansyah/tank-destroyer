@@ -211,14 +211,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (achBackBtn) {
         achBackBtn.addEventListener('click', () => {
             handleButtonWithDelay(achBackBtn, () => {
-                document.getElementById('achievements-screen').classList.add('hidden');
-                document.getElementById('overlay').classList.remove('hidden');
-                document.body.classList.remove('achievements-open');
+                const achScreen = document.getElementById('achievements-screen');
                 
-                // Return to home music
-                if (typeof MusicManager !== 'undefined') {
-                    MusicManager.play('home');
-                }
+                // Add closing animation
+                achScreen.classList.add('closing');
+                
+                // Wait for animation to complete, then hide
+                setTimeout(() => {
+                    achScreen.classList.remove('closing');
+                    achScreen.classList.add('hidden');
+                    document.getElementById('overlay').classList.remove('hidden');
+                    document.body.classList.remove('achievements-open');
+                    
+                    // Return to home music
+                    if (typeof MusicManager !== 'undefined') {
+                        MusicManager.play('home');
+                    }
+                }, 300); // Match CSS animation duration
             });
         });
     }
@@ -321,6 +330,186 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.warn('[Input] Music toggle button or icon not found');
     }
+
+    // ==========================================================================
+    // SETTINGS SCREEN HANDLERS
+    // ==========================================================================
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsScreen = document.getElementById('settings-screen');
+    const settingsBackBtn = document.getElementById('settings-back-btn');
+    const presetBtns = document.querySelectorAll('.preset-btn');
+    
+    // Setting value display elements
+    const settingParticles = document.getElementById('setting-particles');
+    const settingShadows = document.getElementById('setting-shadows');
+    const settingTerrain = document.getElementById('setting-terrain');
+    const settingEffects = document.getElementById('setting-effects');
+    const settingTracks = document.getElementById('setting-tracks');
+    const settingFloatText = document.getElementById('setting-floattext');
+    const settingAI = document.getElementById('setting-ai');
+    
+    // Update settings display based on quality level
+    function updateSettingsDisplay(level) {
+        if (typeof GRAPHICS_QUALITY_LEVELS === 'undefined') return;
+        
+        const settings = GRAPHICS_QUALITY_LEVELS[level];
+        if (!settings) return;
+        
+        // Update each setting value
+        if (settingParticles) {
+            settingParticles.textContent = Math.round(settings.particleMultiplier * 100) + '%';
+        }
+        if (settingShadows) {
+            settingShadows.textContent = settings.shadowQuality === 0 ? 'Off' : 
+                                         settings.shadowQuality < 0.3 ? 'Minimal' :
+                                         settings.shadowQuality < 0.6 ? 'Low' :
+                                         settings.shadowQuality < 0.9 ? 'Medium' : 'Full';
+        }
+        if (settingTerrain) {
+            settingTerrain.textContent = Math.round(settings.terrainDetail * 100) + '%';
+        }
+        if (settingEffects) {
+            settingEffects.textContent = Math.round(settings.effectDetail * 100) + '%';
+        }
+        if (settingTracks) {
+            settingTracks.textContent = settings.trackQuality === 0 ? 'Off' :
+                                        settings.trackQuality < 0.5 ? 'Simple' : 'Full';
+        }
+        if (settingFloatText) {
+            settingFloatText.textContent = settings.floatTextMax + ' max';
+        }
+        if (settingAI) {
+            const rate = settings.aiUpdateRate;
+            settingAI.textContent = rate === 1 ? 'Every frame' : `Every ${rate} frames`;
+        }
+        
+        // Update active preset button
+        presetBtns.forEach(btn => {
+            const btnLevel = parseInt(btn.getAttribute('data-quality'), 10);
+            btn.classList.toggle('active', btnLevel === level);
+        });
+    }
+    
+    // Open settings screen with button animation delay
+    function openSettings() {
+        if (!settingsScreen) return;
+        
+        // Hide overlay (home screen) when settings opens
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+        }
+        
+        settingsScreen.classList.remove('hidden');
+        
+        // Update display with current quality level
+        const currentLevel = typeof getGraphicsQuality === 'function' ? getGraphicsQuality() : 5;
+        updateSettingsDisplay(currentLevel);
+        
+        console.log('[Settings] Opened, current level:', currentLevel);
+    }
+    
+    // Close settings screen with animation
+    function closeSettings() {
+        if (!settingsScreen) return;
+        
+        // Add closing animation class
+        settingsScreen.classList.add('closing');
+        
+        // Wait for animation to complete, then hide and show overlay
+        setTimeout(() => {
+            settingsScreen.classList.remove('closing');
+            settingsScreen.classList.add('hidden');
+            
+            // Show overlay (home screen) with animation
+            const overlay = document.getElementById('overlay');
+            if (overlay) {
+                // Force reflow to ensure animation plays
+                overlay.style.animation = 'none';
+                overlay.offsetHeight; // Trigger reflow
+                overlay.style.animation = '';
+                overlay.classList.remove('hidden');
+            }
+            
+            console.log('[Settings] Closed');
+        }, 300); // Match CSS animation duration
+    }
+    
+    // Handle preset button click
+    function handlePresetClick(e) {
+        const btn = e.currentTarget;
+        const level = parseInt(btn.getAttribute('data-quality'), 10);
+        
+        if (isNaN(level) || level < 0 || level > 5) return;
+        
+        // Apply quality setting
+        if (typeof setGraphicsQuality === 'function') {
+            setGraphicsQuality(level);
+        }
+        
+        // Update display
+        updateSettingsDisplay(level);
+        
+        console.log('[Settings] Quality set to level:', level);
+    }
+    
+    // Settings button click handler with push animation delay
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Add pushed class for animation
+            settingsBtn.classList.add('pushed');
+            
+            // Delay opening to allow push animation to complete
+            setTimeout(() => {
+                settingsBtn.classList.remove('pushed');
+                openSettings();
+            }, 150);
+        });
+        
+        settingsBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Add pushed class for animation
+            settingsBtn.classList.add('pushed');
+            
+            // Delay opening to allow push animation to complete
+            setTimeout(() => {
+                settingsBtn.classList.remove('pushed');
+                openSettings();
+            }, 150);
+        }, { passive: false });
+    }
+    
+    // Settings back button click handler
+    if (settingsBackBtn) {
+        settingsBackBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeSettings();
+        });
+    }
+    
+    // Preset button click handlers
+    presetBtns.forEach(btn => {
+        btn.addEventListener('click', handlePresetClick);
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handlePresetClick(e);
+        }, { passive: false });
+    });
+    
+    // Initialize settings on load
+    setTimeout(() => {
+        if (typeof initGraphicsSettings === 'function') {
+            initGraphicsSettings();
+        }
+        const currentLevel = typeof getGraphicsQuality === 'function' ? getGraphicsQuality() : 5;
+        updateSettingsDisplay(currentLevel);
+        console.log('[Settings] Initialized with level:', currentLevel);
+    }, 100);
 
     // Pause button - with delay for push-in animation
     const pauseBtn = document.getElementById('pause-btn');

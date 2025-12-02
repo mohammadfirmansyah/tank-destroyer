@@ -5,6 +5,222 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2025-12-02
+
+### Fixed
+- 🐛 **Tank Shooting Bug After Continue** - Critical save/load fix
+  - Enemies loaded from save now have `aiState: 'alerted'` instead of default 'patrol'
+  - Set `alertShootDelay: 0` so enemies can shoot immediately after continue
+  - Added `spawnWarmup: 0` and `spawnHoldoff: 0` for instant engagement
+  - Enemies no longer stand idle after loading a saved game
+
+- 🎯 **Magic Skill Range Bug** - Ice and Fire skills activation fix
+  - Ice Burst now requires player within 180px range (strict check)
+  - Fire Nova now requires player within 150px range (strict check)
+  - Added early return in `shouldUseMagicSkill()` to prevent out-of-range activation
+  - Skill-specific range constants: `ICE_BURST_RANGE = 180`, `FIRE_NOVA_RANGE = 150`
+
+- 🧊 **Ice/Fire Tank Approach Logic** - Aggressive pursuit behavior
+  - Ice and Fire tanks now start in 'approaching' state by default
+  - Removed cooldown blocking that prevented approach behavior
+  - Added `skillAlmostReady` check (cooldown <= 120 frames) for urgency
+  - Speed boost based on `urgencyBonus = (1 - cooldownRatio) * 0.5`
+  - Tanks actively pursue player to get within skill range
+
+- 🐛 **Floating Text Performance Bug** - Major performance improvement
+  - Added `floatTextMax` limit per quality level (15-100)
+  - Prevents floating text array from growing indefinitely
+  - Automatic cleanup of oldest non-critical texts when limit reached
+  - **Optimized cleanup from O(n²) to O(n)** using single-pass filter
+  - Uses swap-with-last removal instead of splice for efficiency
+  - Lowest quality: 15 max, Ultra quality: 100 max
+
+### Improved
+- 🤖 **Demo AI Configuration** - Full Tier 5 intelligence
+  - Demo player now uses complete tier 5 AI configuration
+  - Intelligence: 5, Aim Speed: 0.15, Accuracy: 0.90
+  - Added `pathSmoothingFactor: 0.15` for smooth movement
+  - Includes all tier 5 decision-making capabilities
+
+- 🧭 **Wall Avoidance AI** - Intelligent obstacle navigation
+  - Ray-casting system checks obstacles at 100px, 60px, 35px distances
+  - 30-frame `wallAvoidanceLock` prevents zigzag movement
+  - Smooth angle interpolation using `pathSmoothingFactor`
+  - Checks both left and right directions for best escape path
+  - Maintains movement commitment during avoidance maneuvers
+
+- 🔫 **Near-Miss Bullet Detection** - Alert system for patrol enemies
+  - Bullets passing within 60px of patrol enemies trigger alert
+  - Uses angle check (within 45°) to ensure bullet is heading toward enemy
+  - Only triggers for player bullets, not enemy bullets
+  - Patrol enemies become alerted even when not directly hit
+- 🌫️ **Fog of War Animation** - Smoother seamless looping
+  - Uses `performance.now()` for sub-millisecond precision timing
+  - Added smooth easing function `smoothLoop()` for seamless loop transitions
+  - Slower fog wisp speeds with longer periods for natural flow
+  - Gentler cloud movement with golden ratio offsets for organic feel
+  - Smoother particle drift with varied speeds per mote
+  - Longer breathing cycle (~12.5 seconds) for atmospheric pulse
+
+- ⚙️ **Settings Screen** - Full-screen layout redesign
+  - Now uses full-screen layout matching Achievement Screen style
+  - Added decorative top border glow animation
+  - Section cards with background and border styling
+  - Larger quality preset buttons with improved touch targets
+  - Responsive 2-column grid on mobile (3-column on desktop)
+  - Removed emoji from "GRAPHICS SETTINGS" title for cleaner appearance
+  - Removed icons from section titles and back button
+  - Added "Floating Text" setting display showing current limit
+
+- 📜 **Settings Scrollbar** - Military theme consistency
+  - Custom scrollbar matching Achievement Screen style
+  - 8px width with rounded thumb
+  - Brown/khaki colors matching game theme
+  - Hover state for better interactivity
+
+### Changed
+- ⚙️ **Settings Screen Animation** - Cleaner appearance
+  - Removed fade-in animation when settings screen opens
+  - Settings screen now appears instantly for snappier feel
+  - Fade-out animation on close still preserved
+
+### Added
+- ✨ **Screen Transition Animations** - Smooth closing animations
+  - Settings screen now fades out with slide animation when closing
+  - Achievement screen now fades out smoothly when returning to home
+  - Both screens use 300ms transition duration
+  - Consistent animation style across both screens
+
+### Technical
+- `js/demo.js`:
+  - Added tier 5 AI config: `intelligence`, `aimSpeed`, `accuracy`, `pathSmoothingFactor`
+  - Added `smoothMoveAngle`, `smoothMoveWeight` for interpolation
+  - Added `wallAvoidanceAngle`, `wallAvoidanceLock` (30 frames)
+  - Ray-casting checks at WALL_CHECK_DISTANCE (100), MID_DISTANCE (60), CLOSE_DISTANCE (35)
+  - Angle lerp: `current + (target - current) * smoothingFactor`
+
+- `js/saveManager.js`:
+  - `createEnemyFromSave()` now includes:
+    - `aiState: 'alerted'` - immediate combat readiness
+    - `alertShootDelay: 0` - no shooting delay
+    - `spawnWarmup: 0` - no spawn protection
+    - `spawnHoldoff: 0` - can be targeted immediately
+    - `baseSpeed`, `tierId`, wheel/turret visual properties
+
+- `js/config.js`:
+  - Added `floatTextMax` to `smoothPerfValues` defaults
+  - Added `getFloatTextMax()` getter function
+  - Updated `setGraphicsQuality()`, `initGraphicsSettings()`, `updateSmoothPerfValues()`
+
+- `js/systems.js`:
+  - `addFloatText()` now enforces `floatTextMax` limit
+  - Removes oldest non-critical texts when at capacity
+  - Prioritizes keeping critical texts visible
+  - Uses swap-with-last removal O(1) instead of splice O(n)
+  - First cleans dead texts before checking limit
+  - Added `NEAR_MISS_RADIUS = 60` constant
+  - Added near-miss detection in `handleBulletCollision()`
+  - Modified `shouldUseMagicSkill()` with strict range checks at function start
+  - Ice/Fire approach: default 'approaching' state, urgencyBonus calculation
+  - `skillAlmostReady = cooldownFrames <= 120` for urgency detection
+
+- `js/render.js`:
+  - Fog animation now uses `rawTime` from `performance.now()`
+  - Added `smoothLoop()` helper function for seamless sine-based looping
+  - **Replaced splice-in-loop O(n²) with single-pass filter O(n)**
+  - Uses in-place compaction with array truncation
+  - Fog wisps use configurable `period` property per layer
+  - Particle positions use `rawTime` with `driftSpeed` multiplier
+
+- `js/input.js`:
+  - Added `settingFloatText` element reference
+  - `updateSettingsDisplay()` now shows floating text limit
+
+- `index.html`:
+  - Added "Floating Text" row in settings info display
+
+- `css/style.css`:
+  - `#settings-screen` uses `inset: 0` for full-screen coverage
+  - Added `-webkit-overflow-scrolling: touch` for smooth mobile scroll
+  - Added `::before` pseudo-element for top glow decoration
+  - Added custom scrollbar rules matching achievement screen
+  - `.settings-section` has card-style background with shadow
+  - `.quality-presets` responsive grid with media query
+  - `.settings-back-btn` with arrow icon via `::before`
+  - Added `@keyframes settingsFadeOut` and `settingsSlideOut` animations
+  - Added `#settings-screen.closing` class for exit animation
+  - Added `@keyframes achFadeOut` animation for achievements
+  - Added `#achievements-screen.closing` class for exit animation
+  - Removed `display: flex` and emoji from `.section-title`
+  - Removed `animation: settingsFadeIn 0.4s ease-out` from `#settings-screen`
+  - Removed `@keyframes settingsFadeIn` entirely
+
+- `js/input.js`:
+  - `closeSettings()` now adds `.closing` class before hiding
+  - Achievement back button now triggers fade-out animation
+  - Both use 300ms setTimeout matching CSS animation duration
+
+## [2.1.0] - 2025-12-02
+
+### Added
+- ⚙️ **Graphics Settings Screen** - User-configurable quality presets
+  - 6 quality presets: Ultra, High, Medium, Low, Very Low, Lowest
+  - **Default: Lowest quality** for maximum device compatibility
+  - Settings saved to localStorage for persistence
+  - Real-time preview of current settings values
+  - Dramatic military-themed UI with animations
+
+- 🔧 **Settings Button** - Quick access to graphics settings
+  - Located above mute button in bottom-left corner
+  - Gear icon (⚙️) with rotation animation on hover
+  - Same size and style as mute button
+
+### Changed
+- 🎵 **Music Start Hint** - Repositioned to horizontal center
+  - Now appears in the center-bottom of the screen
+  - More prominent with music note icon (🎵)
+  - Improved animations with backdrop blur effect
+
+- 📊 **Benchmark HUD** - Simplified display
+  - Removed "Level X" text, keeping only quality badge
+  - Shows user's graphics setting instead of auto-detected level
+
+### Removed
+- 🗑️ **DEBUG_SMART_PERFORMANCE** - Replaced with user-controlled settings
+  - Auto-performance adjustment removed
+  - Users now have full control over graphics quality
+  - Bottleneck detection system removed
+
+### Technical
+- `js/config.js`:
+  - Added `graphicsQualityLevel`, `loadGraphicsSettings()`, `saveGraphicsSettings()`
+  - Added `setGraphicsQuality()`, `getGraphicsQuality()`, `initGraphicsSettings()`
+  - Replaced `SMART_PERF_LEVELS` with `GRAPHICS_QUALITY_LEVELS`
+  - Removed auto-performance optimizer functions
+  
+- `index.html`:
+  - Added `#settings-screen` with quality presets grid
+  - Added `.settings-btn` button with gear icon
+  - Moved `.music-start-hint` to center as `.music-start-hint-container`
+  - Removed `#bench-quality-level` from benchmark HUD
+  
+- `css/style.css`:
+  - Added comprehensive settings screen styling
+  - Added `.preset-btn` grid with active states
+  - Updated music hint with centered positioning
+  - Hidden `.quality-level` in benchmark HUD
+  
+- `js/input.js`:
+  - Added settings screen open/close handlers
+  - Added preset button click handlers with quality application
+  - Added `updateSettingsDisplay()` for real-time preview
+  
+- `js/main.js`:
+  - Updated to use `graphicsQualityLevel` instead of `smartPerfLevel`
+  - Removed resolution scaling references
+
+---
+
 ## [2.0.7] - 2025-12-02
 
 ### Added

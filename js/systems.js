@@ -1075,28 +1075,34 @@ function shouldUseMagicSkill(enemy, distanceToPlayer) {
             return shouldEscape || shouldFlank;
             
         case 'ice':
-            // IMPROVED: Ice burst is more aggressive when in approach mode
-            // Use when player is within skill range - higher chance when closer
-            if (distanceToPlayer < 150) {
-                // Very close - high chance to use immediately
-                return Math.random() < 0.15 * intelligence;
-            } else if (distanceToPlayer < 250) {
-                // In skill range - good chance to use
+            // FIXED: Ice burst only activates when player is within ACTUAL effect range (180)
+            // No more wasted skill activation when player is too far
+            const ICE_BURST_RANGE = 180;
+            if (distanceToPlayer > ICE_BURST_RANGE) return false; // STRICT range check
+            
+            // Higher chance when closer for more aggressive behavior
+            if (distanceToPlayer < 100) {
+                return Math.random() < 0.12 * intelligence;
+            } else if (distanceToPlayer < 150) {
                 return Math.random() < 0.08 * intelligence;
+            } else {
+                return Math.random() < 0.04 * intelligence;
             }
-            return false;
             
         case 'fire':
-            // IMPROVED: Fire nova is aggressive - use when player is close
+            // FIXED: Fire nova only activates when player is within ACTUAL effect range (150)
+            // No more wasted skill activation when player is too far
+            const FIRE_NOVA_RANGE = 150;
+            if (distanceToPlayer > FIRE_NOVA_RANGE) return false; // STRICT range check
+            
             // Higher chance when very close for maximum damage
-            if (distanceToPlayer < 120) {
-                // Very close - high chance to unleash fire nova
-                return Math.random() < 0.18 * intelligence;
-            } else if (distanceToPlayer < 200) {
-                // In good range - medium chance
+            if (distanceToPlayer < 80) {
+                return Math.random() < 0.15 * intelligence;
+            } else if (distanceToPlayer < 120) {
                 return Math.random() < 0.10 * intelligence;
+            } else {
+                return Math.random() < 0.05 * intelligence;
             }
-            return false;
             
         case 'electric':
             // Use chain lightning when player is in medium range - tactical
@@ -2371,6 +2377,48 @@ function handleBulletCollision(b) {
     }
 
     if (!b.isEnemy) {
+        // === NEAR-MISS BULLET DETECTION ===
+        // Alert patrolling enemies when player bullets pass very close to them
+        // This makes AI more realistic - they notice danger even when not directly hit
+        const NEAR_MISS_RADIUS = 60; // Detection radius for near-miss
+        const nearbyForDetection = getNearbyEnemies(b.x, b.y, NEAR_MISS_RADIUS + 30);
+        for (let j of nearbyForDetection) {
+            const enemy = enemies[j];
+            if (!enemy || enemy.hp <= 0) continue;
+            if (enemy.aiState !== 'patrol') continue; // Only affect patrolling enemies
+            if (enemyHasSpawnShield(enemy)) continue; // Skip spawn-protected
+            
+            const distToEnemy = Math.hypot(b.x - enemy.x, b.y - enemy.y);
+            // Near-miss: bullet is close but not hitting (between radius+10 and NEAR_MISS_RADIUS)
+            if (distToEnemy > enemy.radius + 10 && distToEnemy < NEAR_MISS_RADIUS) {
+                // Check if bullet is heading roughly toward or past the enemy
+                const bulletAngle = Math.atan2(b.vy, b.vx);
+                const toEnemyAngle = Math.atan2(enemy.y - b.y, enemy.x - b.x);
+                let angleDiff = bulletAngle - toEnemyAngle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                
+                // Bullet passing within 45 degrees of enemy direction
+                if (Math.abs(angleDiff) < Math.PI / 4) {
+                    // Alert enemy - detected incoming fire!
+                    alertEnemy(enemy, 'near_miss', true);
+                    
+                    // Visual indicator - subtle particle showing bullet whizz
+                    if (Math.random() < 0.5) {
+                        particles.push({
+                            x: enemy.x + (Math.random() - 0.5) * 30,
+                            y: enemy.y - 40,
+                            vx: 0,
+                            vy: -1,
+                            life: 15,
+                            color: '#fbbf24',
+                            size: 2
+                        });
+                    }
+                }
+            }
+        }
+        
         // Use spatial grid to get only nearby enemies (O(1) average instead of O(n))
         const nearbyEnemyIndices = getNearbyEnemies(b.x, b.y, 50);
         for (let j of nearbyEnemyIndices) {
@@ -3620,7 +3668,7 @@ function updateEnemies(dt) {
             if (e.magicType === 'ice' || e.magicType === 'fire') {
                 // Initialize magic approach state
                 if (e.magicApproachState === undefined) {
-                    e.magicApproachState = 'hunting'; // 'hunting', 'approaching', 'casting', 'retreating'
+                    e.magicApproachState = 'approaching'; // Start approaching immediately
                     e.magicApproachCooldown = 0;
                     e.magicCastingTimer = 0;
                 }
@@ -3629,9 +3677,10 @@ function updateEnemies(dt) {
                 if (e.magicApproachCooldown > 0) e.magicApproachCooldown -= dt;
                 if (e.magicCastingTimer > 0) e.magicCastingTimer -= dt;
                 
-                // Check skill status
+                // Check skill status - use broader threshold for approach decision
+                const skillAlmostReady = e.magicCooldown <= 120; // Within 2 seconds of ready
                 const skillReady = e.magicCooldown <= 30; // Within 0.5 second of ready
-                const skillOnCooldown = e.magicCooldown > 60;
+                const skillOnCooldown = e.magicCooldown > 180; // Over 3 seconds on cooldown
                 const isCurrentlyCasting = e.magicActive && e.magicActiveTime > 0 && e.magicActiveTime < 60;
                 
                 // State machine for intelligent magic tank behavior
@@ -3665,8 +3714,8 @@ function updateEnemies(dt) {
                             speedMult = 0.5;
                         }
                     } else {
-                        // Retreat complete - back to hunting
-                        e.magicApproachState = 'hunting';
+                        // Retreat complete - back to approaching
+                        e.magicApproachState = 'approaching';
                     }
                     
                 } else if (skillReady && d <= MAGIC_CAST_RANGE) {
@@ -3679,25 +3728,31 @@ function updateEnemies(dt) {
                     const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
                     e.targetAngle = angleToPlayer;
                     
-                } else if (skillReady && d > MAGIC_CAST_RANGE && e.magicApproachCooldown <= 0) {
-                    // Skill ready but too far - aggressively approach
+                } else if (d > MAGIC_CAST_RANGE && (skillAlmostReady || !skillOnCooldown)) {
+                    // IMPROVED: Approach aggressively whenever skill is almost ready OR not on heavy cooldown
+                    // This makes ice/fire tanks actively pursue player to get in range
                     e.magicApproachState = 'approaching';
                     magicApproachMode = true;
                     
                     // Move directly toward player with urgency
                     moveAngle = targetAngle;
                     
+                    // Calculate speed based on how close skill is to being ready
+                    const cooldownRatio = Math.max(0, e.magicCooldown) / (MAGIC_SKILL_COOLDOWNS[e.magicType] || 300);
+                    const urgencyBonus = (1 - cooldownRatio) * 0.5; // More speed as skill gets ready
+                    
                     // Aggressive speed based on magic type
                     if (e.magicType === 'fire') {
                         // Fire tanks are reckless - very fast approach
-                        speedMult = 1.8 + (intelligence * 0.2);
+                        speedMult = 1.6 + (intelligence * 0.2) + urgencyBonus;
                     } else {
                         // Ice tanks are calculated - fast but controlled
-                        speedMult = 1.5 + (intelligence * 0.15);
+                        speedMult = 1.4 + (intelligence * 0.15) + urgencyBonus;
                     }
                     
-                    // Visual indicator - charged particle trail
-                    if (Math.random() < 0.2) {
+                    // Visual indicator - charged particle trail (more intense as skill becomes ready)
+                    const particleChance = skillAlmostReady ? 0.3 : 0.15;
+                    if (Math.random() < particleChance) {
                         const particleColor = e.magicType === 'fire' ? '#ff4500' : '#3b82f6';
                         const secondaryColor = e.magicType === 'fire' ? '#ff9500' : '#00bcd4';
                         particles.push({
@@ -3711,28 +3766,31 @@ function updateEnemies(dt) {
                         });
                     }
                     
-                } else if (skillOnCooldown) {
-                    // Skill on cooldown - maintain safe distance (hunting mode)
+                } else if (skillOnCooldown && d <= MAGIC_CAST_RANGE) {
+                    // In range but skill on cooldown - strafe and wait
                     e.magicApproachState = 'hunting';
                     
-                    // Kite at medium range while waiting for cooldown
-                    if (d < 200) {
-                        // Too close - back off
-                        moveAngle = Math.atan2(e.y - player.y, e.x - player.x);
-                        speedMult = 1.2;
-                    } else if (d > 350) {
-                        // Too far - move closer
-                        moveAngle = targetAngle;
-                        speedMult = 0.8;
-                    } else {
-                        // Good range - strafe
-                        const strafeDir = e.strafeDir || (Math.random() > 0.5 ? 1 : -1);
-                        e.strafeDir = strafeDir;
-                        moveAngle = targetAngle + (Math.PI * 0.5 * strafeDir);
-                        speedMult = 0.6;
-                    }
+                    // Strafe at optimal range
+                    const strafeDir = e.strafeDir || (Math.random() > 0.5 ? 1 : -1);
+                    e.strafeDir = strafeDir;
+                    moveAngle = targetAngle + (Math.PI * 0.5 * strafeDir);
+                    speedMult = 0.7;
+                    
+                } else if (skillOnCooldown) {
+                    // Skill on heavy cooldown and far - move closer while waiting
+                    e.magicApproachState = 'approaching';
+                    magicApproachMode = true;
+                    
+                    // Approach at moderate speed
+                    moveAngle = targetAngle;
+                    speedMult = 1.0 + (intelligence * 0.1);
+                    
                 } else {
-                    e.magicApproachState = 'hunting';
+                    // Default: approach player
+                    e.magicApproachState = 'approaching';
+                    magicApproachMode = true;
+                    moveAngle = targetAngle;
+                    speedMult = 1.2;
                 }
             }
             
@@ -10452,6 +10510,56 @@ function takeDamage(dmg) {
 }
 
 function addFloatText(t, x, y, c, isCritical = false) {
+    // === PERFORMANCE: Enforce floating text limit based on graphics settings ===
+    // Get maximum allowed floating texts from graphics settings
+    const maxFloatTexts = typeof getFloatTextMax === 'function' ? getFloatTextMax() : 50;
+    
+    // === PERFORMANCE: First pass - remove any dead texts to make room ===
+    // This is more efficient than splice in a loop
+    if (floatText.length >= maxFloatTexts) {
+        let writeIdx = 0;
+        for (let readIdx = 0; readIdx < floatText.length; readIdx++) {
+            if (floatText[readIdx].life > 0) {
+                if (writeIdx !== readIdx) {
+                    floatText[writeIdx] = floatText[readIdx];
+                }
+                writeIdx++;
+            }
+        }
+        floatText.length = writeIdx;
+    }
+    
+    // If still at limit after cleanup, remove oldest non-critical text
+    if (floatText.length >= maxFloatTexts) {
+        // Find oldest non-critical text to remove
+        let oldestIdx = -1;
+        let lowestLife = Infinity;
+        
+        for (let i = 0; i < floatText.length; i++) {
+            // Skip critical texts if possible
+            if (!floatText[i].isCritical && floatText[i].life < lowestLife) {
+                lowestLife = floatText[i].life;
+                oldestIdx = i;
+            }
+        }
+        
+        // If all are critical, remove the oldest one anyway
+        if (oldestIdx === -1) {
+            oldestIdx = 0;
+            for (let i = 1; i < floatText.length; i++) {
+                if (floatText[i].life < floatText[oldestIdx].life) {
+                    oldestIdx = i;
+                }
+            }
+        }
+        
+        // Use efficient removal by swapping with last element
+        if (oldestIdx !== -1 && oldestIdx < floatText.length) {
+            floatText[oldestIdx] = floatText[floatText.length - 1];
+            floatText.length--;
+        }
+    }
+    
     // Check for exact duplicate text nearby - prevent double display
     // But allow different texts at same location (stacking)
     for (let f of floatText) {

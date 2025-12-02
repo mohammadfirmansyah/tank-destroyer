@@ -2,7 +2,7 @@
  * Cache Buster - Force fresh assets on every page load
  * This script clears all browser caches and ensures fresh content
  * 
- * v2.0.7 Update:
+ * v2.1.1 Update:
  * - Force hard refresh EVERY time application opens (not just per session)
  * - Clear all browser caches including HTTP cache
  * - Use fetch with cache: 'reload' for true cache bypass
@@ -12,7 +12,7 @@
 (function() {
     'use strict';
     
-    const CACHE_BUSTER_VERSION = 'v2.0.7';
+    const CACHE_BUSTER_VERSION = 'v2.1.1';
     const CACHE_VERSION_KEY = 'tank_destroyer_version';
     const LAST_LOAD_KEY = 'tank_destroyer_last_load';
     

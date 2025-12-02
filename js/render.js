@@ -12832,6 +12832,23 @@ function drawBossTurretShape(ctx, shape, color, glowColor, isFiring) {
         f.y -= speedMultiplier;
         f.life--;
     }
+    
+    // === PERFORMANCE: Clean up dead floating texts ===
+    // Use efficient single-pass filter instead of multiple splice operations
+    // Splice in a loop is O(n²) - filter is O(n)
+    if (floatText.length > 0) {
+        let writeIndex = 0;
+        for (let readIndex = 0; readIndex < floatText.length; readIndex++) {
+            if (floatText[readIndex].life > 0) {
+                if (writeIndex !== readIndex) {
+                    floatText[writeIndex] = floatText[readIndex];
+                }
+                writeIndex++;
+            }
+        }
+        // Truncate array to remove dead entries
+        floatText.length = writeIndex;
+    }
 
     CTX.restore();
     
@@ -12987,7 +13004,17 @@ function drawDesktopCrosshair() {
 // Covers entire screen evenly with smooth rounded corners, dramatic and suspenseful
 // Uses display dimensions and CTX.scale() to handle resolution scaling correctly
 function drawFogOfWarVignette() {
-    const time = typeof frame !== 'undefined' ? frame : Date.now() * 0.06;
+    // Use smoother time calculation with consistent delta for seamless looping
+    // Performance.now() provides sub-millisecond precision for buttery smooth animations
+    const rawTime = typeof performance !== 'undefined' ? performance.now() * 0.001 : Date.now() * 0.001;
+    const time = rawTime * 60; // Convert to frame-like units for existing calculations
+    
+    // Smooth easing function for seamless loop transitions
+    const smoothLoop = (t, period) => {
+        const phase = (t % period) / period; // 0 to 1
+        // Use sine easing for seamless start/end matching
+        return Math.sin(phase * Math.PI * 2) * 0.5 + 0.5;
+    };
     
     CTX.save();
     
@@ -13024,15 +13051,19 @@ function drawFogOfWarVignette() {
     
     // === LAYER 2: Animated fog wisps - flowing across screen ===
     // Multiple fog layers moving at different speeds for depth
+    // Slower speeds and longer periods for smoother looping
     const fogLayers = [
-        { speed: 0.0003, scale: 0.8, alpha: 0.08, yOffset: 0 },
-        { speed: 0.0005, scale: 1.2, alpha: 0.06, yOffset: h * 0.3 },
-        { speed: 0.0004, scale: 1.0, alpha: 0.07, yOffset: h * 0.6 }
+        { speed: 0.00015, scale: 0.8, alpha: 0.08, yOffset: 0, period: 20000 },
+        { speed: 0.00025, scale: 1.2, alpha: 0.06, yOffset: h * 0.3, period: 15000 },
+        { speed: 0.0002, scale: 1.0, alpha: 0.07, yOffset: h * 0.6, period: 18000 }
     ];
     
     fogLayers.forEach((fog, index) => {
-        const xOffset = (time * fog.speed * w) % (w * 2) - w * 0.5;
-        const waveY = Math.sin(time * 0.008 + index) * 20;
+        // Use modulo with period for seamless looping without visible seams
+        const loopPhase = smoothLoop(rawTime * 1000, fog.period);
+        const xOffset = loopPhase * w * 2 - w * 0.5;
+        // Smoother wave with longer period and eased values
+        const waveY = Math.sin(rawTime * 0.5 + index * 2.094) * 15; // 2.094 = 2π/3 for even distribution
         
         // Create flowing fog gradient
         const fogGrad = CTX.createLinearGradient(
@@ -13052,12 +13083,17 @@ function drawFogOfWarVignette() {
     
     // === LAYER 3: Fog density clouds - scattered across screen ===
     // Creates patches of denser fog for visual interest
+    // Slower animation speeds for smoother, less jarring motion
     const cloudCount = isLandscape ? 8 : 6;
     for (let i = 0; i < cloudCount; i++) {
-        const cloudX = (w * (i / cloudCount) + Math.sin(time * 0.005 + i * 2) * w * 0.1) % w;
-        const cloudY = (h * ((i * 0.618) % 1) + Math.cos(time * 0.004 + i) * h * 0.08);
-        const cloudSize = baseSize * (0.2 + Math.sin(time * 0.003 + i * 1.5) * 0.05);
-        const cloudAlpha = 0.04 + Math.sin(time * 0.006 + i * 0.8) * 0.02;
+        // Use slower sine waves with golden ratio offsets for organic movement
+        const cloudPhaseX = Math.sin(rawTime * 0.25 + i * 1.618) * 0.5 + 0.5; // Slower, smoother
+        const cloudPhaseY = Math.cos(rawTime * 0.2 + i * 2.236) * 0.5 + 0.5; // Even slower vertical
+        const cloudX = w * (i / cloudCount) + cloudPhaseX * w * 0.15;
+        const cloudY = h * ((i * 0.618) % 1) + cloudPhaseY * h * 0.1;
+        // Gentler size pulsing with longer period
+        const cloudSize = baseSize * (0.2 + Math.sin(rawTime * 0.15 + i * 1.5) * 0.03);
+        const cloudAlpha = 0.04 + Math.sin(rawTime * 0.3 + i * 0.8) * 0.015;
         
         const cloudGrad = CTX.createRadialGradient(
             cloudX, cloudY, 0,
@@ -13136,21 +13172,27 @@ function drawFogOfWarVignette() {
     });
     
     // === LAYER 6: Subtle pulsing atmosphere ===
-    // Adds tension with slow breathing effect
-    const pulseAlpha = 0.02 + Math.sin(time * 0.015) * 0.015;
+    // Adds tension with slow breathing effect - longer period for smoother loop
+    const pulseAlpha = 0.02 + Math.sin(rawTime * 0.5) * 0.012; // ~12.5 second breathing cycle
     CTX.globalAlpha = pulseAlpha;
     CTX.fillStyle = 'rgb(20, 25, 45)';
     CTX.fillRect(0, 0, w, h);
     
     // === LAYER 7: Particle dust motes floating in fog ===
     // Small animated particles for depth and atmosphere
+    // Smoother drift with continuous looping
     CTX.globalAlpha = 1;
     const particleCount = isLandscape ? 15 : 10;
     for (let i = 0; i < particleCount; i++) {
-        const px = (w * ((i * 0.73 + time * 0.00005 * (i + 1)) % 1));
-        const py = (h * ((i * 0.41 + Math.sin(time * 0.008 + i) * 0.1) % 1));
-        const pSize = 1 + Math.sin(time * 0.01 + i * 2) * 0.5;
-        const pAlpha = 0.15 + Math.sin(time * 0.012 + i * 1.5) * 0.1;
+        // Use rawTime for smoother, slower particle drift
+        const driftSpeed = 0.02 + (i % 5) * 0.005; // Varied speeds for natural look
+        const px = (w * ((i * 0.73 + rawTime * driftSpeed) % 1));
+        // Slower vertical bobbing with smoother sine wave
+        const py = (h * ((i * 0.41 + Math.sin(rawTime * 0.4 + i * 1.618) * 0.08) % 1));
+        // Gentler size pulsing
+        const pSize = 1 + Math.sin(rawTime * 0.5 + i * 2) * 0.4;
+        // Smoother alpha breathing
+        const pAlpha = 0.12 + Math.sin(rawTime * 0.6 + i * 1.5) * 0.08;
         
         CTX.beginPath();
         CTX.arc(px, py, pSize, 0, Math.PI * 2);

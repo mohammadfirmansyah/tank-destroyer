@@ -429,11 +429,28 @@ function createDemoPlayer() {
     player.stunned = 0;
     
     // AI-specific properties stored on player for demo
+    // Uses TIER 5 AI configuration for maximum intelligence and smooth movement
+    const DEMO_AI_TIER = 5; // Use tier 5 intelligence for demo player
+    const tier5Config = ENEMY_TIERS[DEMO_AI_TIER] || ENEMY_TIERS[5];
+    
     player.demoAI = {
         target: null,
         targetSwitchTimer: 0,
         strafeDir: 1,
-        cooldown: 0
+        cooldown: 0,
+        // Tier 5 AI properties for intelligent behavior
+        intelligence: tier5Config.intelligence || 5,
+        aimSpeed: tier5Config.aimSpeed || 0.15,
+        accuracy: tier5Config.accuracy || 0.90,
+        // Smooth movement state (prevents zigzag)
+        smoothMoveAngle: 0,
+        smoothMoveWeight: 0,
+        lastMoveAngle: 0,
+        // Wall avoidance state
+        wallAvoidanceAngle: 0,
+        wallAvoidanceLock: 0,
+        // Path smoothing
+        pathSmoothingFactor: 0.15 // Higher = smoother turns (tier 5)
     };
 }
 
@@ -998,69 +1015,102 @@ function updateDemoPlayerAI() {
         // DEMO uses closer combat distance for more action (180 vs real game's larger range)
         const optimalDist = 180;
         
-        // Update strafe direction periodically
-        if (!ai.strafeDir || Math.random() < 0.01 * demoDt) {
+        // Update strafe direction periodically (less frequent to prevent zigzag)
+        if (!ai.strafeDir || Math.random() < 0.005 * demoDt) {
             ai.strafeDir = Math.random() > 0.5 ? 1 : -1;
         }
         
-        // Calculate base movement angle
-        let moveAngle = targetAngle;
+        // Calculate desired movement angle based on distance
+        let desiredMoveAngle = targetAngle;
         
         // DEMO: Tighter approach/retreat thresholds for closer combat
         if (dist > optimalDist + 50) {
             // Move closer to target
-            moveAngle = targetAngle;
+            desiredMoveAngle = targetAngle;
         } else if (dist < optimalDist - 50) {
             // Move away from target
-            moveAngle = targetAngle + Math.PI;
+            desiredMoveAngle = targetAngle + Math.PI;
         } else {
             // At optimal distance - strafe
-            moveAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
+            desiredMoveAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
         }
         
-        // === WALL/OBSTACLE AVOIDANCE (uses same system as enemy AI) ===
-        // Check if desired movement direction is blocked
-        if (typeof pathBlocked === 'function' && typeof findAvoidanceAngle === 'function') {
-            // Use game's avoidance system for consistent behavior
-            const avoidanceOffset = findAvoidanceAngle(player, moveAngle);
-            moveAngle += avoidanceOffset;
-        } else {
-            // Fallback: Simple obstacle detection and avoidance
-            const checkDist = 80;
-            const checkX = player.x + Math.cos(moveAngle) * checkDist;
-            const checkY = player.y + Math.sin(moveAngle) * checkDist;
+        // === INTELLIGENT WALL AVOIDANCE (Tier 5 AI) ===
+        // Check multiple distances ahead for smooth navigation
+        const checkDistances = [100, 60, 35]; // Far, medium, close checks
+        let wallAvoidanceNeeded = false;
+        let bestAvoidanceAngle = desiredMoveAngle;
+        
+        for (const checkDist of checkDistances) {
+            const checkX = player.x + Math.cos(desiredMoveAngle) * checkDist;
+            const checkY = player.y + Math.sin(desiredMoveAngle) * checkDist;
             
             if (checkDemoWallCollision(checkX, checkY, player.radius || 25)) {
-                // Path blocked - try alternative directions
-                const alternatives = [
-                    moveAngle + Math.PI / 4,
-                    moveAngle - Math.PI / 4,
-                    moveAngle + Math.PI / 2,
-                    moveAngle - Math.PI / 2,
-                    moveAngle + Math.PI * 0.75,
-                    moveAngle - Math.PI * 0.75
-                ];
+                wallAvoidanceNeeded = true;
                 
-                for (const altAngle of alternatives) {
-                    const altX = player.x + Math.cos(altAngle) * checkDist;
-                    const altY = player.y + Math.sin(altAngle) * checkDist;
-                    if (!checkDemoWallCollision(altX, altY, player.radius || 25)) {
-                        moveAngle = altAngle;
+                // Use locked avoidance angle if recently set (prevents zigzag)
+                if (ai.wallAvoidanceLock > 0) {
+                    bestAvoidanceAngle = ai.wallAvoidanceAngle;
+                    break;
+                }
+                
+                // Find best clear path using ray-casting
+                const rayAngles = [];
+                for (let offset = 0.2; offset <= Math.PI; offset += 0.2) {
+                    rayAngles.push(desiredMoveAngle + offset);
+                    rayAngles.push(desiredMoveAngle - offset);
+                }
+                
+                for (const testAngle of rayAngles) {
+                    const testX = player.x + Math.cos(testAngle) * checkDist;
+                    const testY = player.y + Math.sin(testAngle) * checkDist;
+                    if (!checkDemoWallCollision(testX, testY, player.radius || 25)) {
+                        bestAvoidanceAngle = testAngle;
+                        // Lock this angle for a period to prevent zigzag
+                        ai.wallAvoidanceAngle = testAngle;
+                        ai.wallAvoidanceLock = 30; // Lock for 0.5 seconds
                         break;
                     }
                 }
+                break;
             }
         }
         
-        // Calculate final movement vector
-        let moveX = Math.cos(moveAngle) * playerSpeed;
-        let moveY = Math.sin(moveAngle) * playerSpeed;
+        // Decay wall avoidance lock
+        if (ai.wallAvoidanceLock > 0) {
+            ai.wallAvoidanceLock -= demoDt;
+            if (wallAvoidanceNeeded) {
+                bestAvoidanceAngle = ai.wallAvoidanceAngle;
+            }
+        }
         
-        // Add slight strafing component for variety (reduced when avoiding obstacles)
+        let moveAngle = wallAvoidanceNeeded ? bestAvoidanceAngle : desiredMoveAngle;
+        
+        // === SMOOTH MOVEMENT INTERPOLATION (Tier 5 AI) ===
+        // Smoothly interpolate between current and target angle to prevent zigzag
+        const smoothingFactor = ai.pathSmoothingFactor || 0.15;
+        
+        // Calculate angle difference with wrap-around handling
+        let smoothAngleDiff = moveAngle - (ai.smoothMoveAngle || moveAngle);
+        while (smoothAngleDiff > Math.PI) smoothAngleDiff -= Math.PI * 2;
+        while (smoothAngleDiff < -Math.PI) smoothAngleDiff += Math.PI * 2;
+        
+        // Apply smoothing - higher intelligence = smoother transitions
+        ai.smoothMoveAngle = (ai.smoothMoveAngle || moveAngle) + smoothAngleDiff * smoothingFactor * demoDt;
+        
+        // Use smoothed angle for final movement
+        const finalMoveAngle = ai.smoothMoveAngle;
+        
+        // Calculate final movement vector using smoothed angle
+        let moveX = Math.cos(finalMoveAngle) * playerSpeed;
+        let moveY = Math.sin(finalMoveAngle) * playerSpeed;
+        
+        // Add slight strafing component (reduced when avoiding obstacles)
         const strafeAngle = targetAngle + Math.PI / 2 * ai.strafeDir;
-        const avoidingObstacle = (player.obstacleLock && player.obstacleLock.ttl > 0);
-        const strafeWeight = avoidingObstacle ? 0.1 : 0.3;
+        const avoidingObstacle = wallAvoidanceNeeded || (ai.wallAvoidanceLock > 0);
+        const strafeWeight = avoidingObstacle ? 0.05 : 0.15; // Reduced strafe to prevent zigzag
         moveX += Math.cos(strafeAngle) * playerSpeed * strafeWeight;
+
         moveY += Math.sin(strafeAngle) * playerSpeed * strafeWeight;
         
         // Apply movement with collision check (final safety net)
