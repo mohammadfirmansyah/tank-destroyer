@@ -289,53 +289,10 @@ let smoothPerfValues = {
     shadowQuality: 1.0,
     terrainDetail: 1.0,
     trackQuality: 1.0,
-    wallDetail: 1.0,
-    resolutionScale: 1.0  // NEW: Canvas resolution scaling (1.0 = native, 0.5 = half res)
+    wallDetail: 1.0
 };
 const PERF_LERP_SPEED = 0.08; // How fast values transition when DECREASING quality
 const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING quality (instant feel)
-
-// =============================================================================
-// DEBUG: Resolution Scaling Toggle
-// Set to true to enable resolution scaling via SmartPerf (experimental)
-// Set to false to disable - canvas always renders at native resolution
-// =============================================================================
-const DEBUG_ENABLE_RESOLUTION_SCALING = true;
-
-// Track current applied resolution scale - used by resize() in world.js
-let currentResolutionScale = 1.0;
-
-// Update resolution scale value - the actual canvas resize is handled by resize() in world.js
-// This prevents double-scaling bugs where both functions try to resize canvas
-// Only applies scaling if DEBUG_ENABLE_RESOLUTION_SCALING is true
-function applyResolutionScale(scale) {
-    // If resolution scaling is disabled, always use native resolution
-    if (!DEBUG_ENABLE_RESOLUTION_SCALING) {
-        if (currentResolutionScale !== 1.0) {
-            currentResolutionScale = 1.0;
-            // Force resize to native resolution
-            if (typeof resize === 'function') {
-                if (typeof lastWidth !== 'undefined') lastWidth = 0;
-                if (typeof lastHeight !== 'undefined') lastHeight = 0;
-                resize();
-            }
-        }
-        return;
-    }
-    
-    if (scale === currentResolutionScale) return;
-    
-    // Only update the scale value - resize() will use this when it runs
-    currentResolutionScale = scale;
-    
-    // Trigger a resize to apply the new scale
-    if (typeof resize === 'function') {
-        // Force resize by temporarily clearing lastWidth/lastHeight
-        if (typeof lastWidth !== 'undefined') lastWidth = 0;
-        if (typeof lastHeight !== 'undefined') lastHeight = 0;
-        resize();
-    }
-}
 
 // Reset Smart Performance to full quality - call when starting new game
 // This ensures game always starts at highest graphics, not leftover degraded state
@@ -357,10 +314,6 @@ function resetSmartPerformance() {
     smoothPerfValues.terrainDetail = fullQuality.terrainDetail;
     smoothPerfValues.trackQuality = fullQuality.trackQuality;
     smoothPerfValues.wallDetail = fullQuality.wallDetail;
-    smoothPerfValues.resolutionScale = fullQuality.resolutionScale;
-    
-    // Reset resolution to native
-    applyResolutionScale(1.0);
     
     // Reset metrics
     smartPerfMetrics = {
@@ -396,7 +349,7 @@ function updateSmoothPerfValues() {
     const speed = isRecovering ? PERF_LERP_SPEED_RECOVERY : PERF_LERP_SPEED;
     
     smoothPerfValues.particleMultiplier = lerpValue(smoothPerfValues.particleMultiplier, target.particleMultiplier, speed);
-    smoothPerfValues.maxParticles = Math.round(lerpValue(smoothPerfValues.maxParticles, target.maxParticles, speed));
+    smoothPerfValues.maxParticles = (lerpValue(smoothPerfValues.maxParticles, target.maxParticles, speed) + 0.5) | 0;
     smoothPerfValues.cullDistance = lerpValue(smoothPerfValues.cullDistance, target.cullDistance, speed);
     smoothPerfValues.trailLength = lerpValue(smoothPerfValues.trailLength, target.trailLength, speed);
     smoothPerfValues.effectDetail = lerpValue(smoothPerfValues.effectDetail, target.effectDetail, speed);
@@ -404,17 +357,6 @@ function updateSmoothPerfValues() {
     smoothPerfValues.terrainDetail = lerpValue(smoothPerfValues.terrainDetail, target.terrainDetail, speed);
     smoothPerfValues.trackQuality = lerpValue(smoothPerfValues.trackQuality, target.trackQuality, speed);
     smoothPerfValues.wallDetail = lerpValue(smoothPerfValues.wallDetail, target.wallDetail, speed);
-    
-    // Handle resolution scale separately - apply immediately when changed
-    // If DEBUG_ENABLE_RESOLUTION_SCALING is false, always use 100% resolution
-    const targetResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? target.resolutionScale : 1.0;
-    const oldResScale = smoothPerfValues.resolutionScale;
-    smoothPerfValues.resolutionScale = lerpValue(smoothPerfValues.resolutionScale, targetResScale, speed * 0.5);
-    
-    // Apply resolution scale when it changes significantly (> 0.5% change)
-    if (Math.abs(smoothPerfValues.resolutionScale - currentResolutionScale) > 0.005) {
-        applyResolutionScale(smoothPerfValues.resolutionScale);
-    }
 }
 
 // Bottleneck detection counters (accumulated over check interval)
@@ -500,11 +442,10 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 1.0,     // All terrain details
         trackQuality: 1.0,      // Full bezier curves
         wallDetail: 1.0,        // Full wall rendering
-        resolutionScale: 1.0,   // Native resolution (blocky but full res)
         aiUpdateRate: 1,        // Update AI every frame
         description: 'Ultra Quality'
     },
-    1: { // Slight reduction - High quality with minor downscale
+    1: { // Slight reduction - High quality
         particleMultiplier: 0.85,
         maxParticles: 350,
         cullDistance: 1300,
@@ -514,7 +455,6 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.9,     // Skip some grass blades
         trackQuality: 0.9,      // Slightly simpler curves
         wallDetail: 0.95,       // Slightly less detail
-        resolutionScale: 0.95,  // 95% resolution (slight downscale)
         aiUpdateRate: 1,        // Still every frame
         description: 'High Quality'
     },
@@ -528,7 +468,6 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.7,     // Skip pebbles & grass
         trackQuality: 0.7,      // Simpler curves
         wallDetail: 0.8,        // Skip some details
-        resolutionScale: 0.85,  // 85% resolution
         aiUpdateRate: 2,        // Update AI every 2 frames
         description: 'Medium Quality'
     },
@@ -542,7 +481,6 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.5,     // Basic terrain only
         trackQuality: 0.5,      // Simple lines
         wallDetail: 0.6,        // Basic walls
-        resolutionScale: 0.75,  // 75% resolution
         aiUpdateRate: 2,        // Every 2 frames
         description: 'Low Quality'
     },
@@ -556,7 +494,6 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.3,     // Flat colors only
         trackQuality: 0.3,      // Straight lines
         wallDetail: 0.4,        // Very basic
-        resolutionScale: 0.65,  // 65% resolution
         aiUpdateRate: 3,        // Every 3 frames
         description: 'Very Low Quality'
     },
@@ -570,7 +507,6 @@ const SMART_PERF_LEVELS = {
         terrainDetail: 0.1,     // Solid colors
         trackQuality: 0,        // No tracks
         wallDetail: 0.3,        // Minimal
-        resolutionScale: 0.5,   // 50% resolution (half)
         aiUpdateRate: 4,        // Every 4 frames
         description: 'Emergency Mode'
     }
@@ -634,12 +570,7 @@ function updateSmartPerformance(currentFPS) {
             smartPerfLevel = 0; // Instant recovery to full quality
             smartPerfRecoveryFrames = 0;
             if (DEBUG_SHOW_FPS) {
-                const settings = getSmartPerfSettings();
-                // If resolution scaling disabled, always show 100%
-                const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
-                const targetW = Math.round(displayWidth * effectiveResScale);
-                const targetH = Math.round(displayHeight * effectiveResScale);
-                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0 | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
+                console.log(`[SmartPerf] FPS excellent (avg: ${avgFPS.toFixed(1)}). FULL QUALITY restored! Level: 0`);
             }
         }
         return;
@@ -657,11 +588,7 @@ function updateSmartPerformance(currentFPS) {
                 smartPerfLevel += levelsToJump;
                 if (DEBUG_SHOW_FPS) {
                     const settings = getSmartPerfSettings();
-                    // If resolution scaling disabled, always show 100%
-                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
-                    const targetW = Math.round(displayWidth * effectiveResScale);
-                    const targetH = Math.round(displayHeight * effectiveResScale);
-                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
+                    console.log(`[SmartPerf] CRITICAL FPS (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description}`);
                 }
             }
         } else if (minFPS < warningFPS || avgFPS < warningFPS) {
@@ -671,11 +598,7 @@ function updateSmartPerformance(currentFPS) {
                 smartPerfLevel++;
                 if (DEBUG_SHOW_FPS) {
                     const settings = getSmartPerfSettings();
-                    // If resolution scaling disabled, always show 100%
-                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
-                    const targetW = Math.round(displayWidth * effectiveResScale);
-                    const targetH = Math.round(displayHeight * effectiveResScale);
-                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
+                    console.log(`[SmartPerf] FPS warning (avg: ${avgFPS.toFixed(1)}, min: ${minFPS.toFixed(1)}). Bottleneck: ${smartPerfBottleneck}. Level: ${smartPerfLevel} - ${settings.description}`);
                 }
             }
         } else {
@@ -688,11 +611,7 @@ function updateSmartPerformance(currentFPS) {
                 smartPerfRecoveryFrames = 0;
                 if (DEBUG_SHOW_FPS) {
                     const settings = getSmartPerfSettings();
-                    // If resolution scaling disabled, always show 100%
-                    const effectiveResScale = DEBUG_ENABLE_RESOLUTION_SCALING ? settings.resolutionScale : 1.0;
-                    const targetW = Math.round(displayWidth * effectiveResScale);
-                    const targetH = Math.round(displayHeight * effectiveResScale);
-                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel} | Target Resolution: ${targetW}×${targetH} (${Math.round(effectiveResScale * 100)}%)`);
+                    console.log(`[SmartPerf] FPS improving (avg: ${avgFPS.toFixed(1)}). Gradual recovery. Level: ${smartPerfLevel}`);
                 }
             }
         }

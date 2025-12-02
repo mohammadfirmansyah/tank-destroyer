@@ -60,27 +60,22 @@ function startDemo() {
     
     // Calculate buffer dimensions using reference resolution
     const bufferHeight = referenceHeight;
-    const bufferWidth = Math.round(referenceHeight * aspectRatio);
+    const bufferWidth = (referenceHeight * aspectRatio + 0.5) | 0;
     
     // Store display dimensions globally (use reference-based buffer dimensions)
     displayWidth = bufferWidth;
     displayHeight = bufferHeight;
     
-    // Check if resolution scaling is enabled via debug flag
-    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-    
-    // Apply resolution scaling only if debug flag is enabled
-    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
-        ? currentResolutionScale 
-        : 1.0;
-    
-    // Set canvas buffer to reference resolution (with optional resolution scale)
-    CANVAS.width = Math.floor(bufferWidth * resScale);
-    CANVAS.height = Math.floor(bufferHeight * resScale);
+    // Set canvas buffer to reference resolution
+    CANVAS.width = bufferWidth;
+    CANVAS.height = bufferHeight;
     
     // Stretch canvas to fill actual screen (creates zoom effect)
     CANVAS.style.width = screenWidth + 'px';
     CANVAS.style.height = screenHeight + 'px';
+    
+    // Disable antialiasing for crisp pixel-art look
+    CTX.imageSmoothingEnabled = false;
     
     // === MOBILE GPU-SAFE DEMO INITIALIZATION ===
     // Step 1: Reset canvas context state (prevents GPU state corruption on mobile)
@@ -2225,17 +2220,8 @@ function drawDemoOverlay() {
     
     CTX.save();
     
-    // Reset transform for overlay (rendered at display resolution, not scaled buffer)
+    // Reset transform for overlay (rendered at display resolution)
     CTX.setTransform(1, 0, 0, 1, 0, 0);
-    
-    // Check if resolution scaling is enabled via debug flag
-    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
-        ? currentResolutionScale 
-        : 1.0;
-    if (resScale !== 1.0) {
-        CTX.scale(resScale, resScale);
-    }
     
     // === LAYER 1: Base fog coverage - entire screen with uniform density ===
     // Always rendered (basic fog layer)
@@ -2429,26 +2415,21 @@ window.addEventListener('resize', () => {
         
         // Calculate buffer dimensions using reference resolution
         const bufferHeight = referenceHeight;
-        const bufferWidth = Math.round(referenceHeight * aspectRatio);
+        const bufferWidth = (referenceHeight * aspectRatio + 0.5) | 0;
         
         // Store display dimensions globally (use reference-based buffer dimensions)
         displayWidth = bufferWidth;
         displayHeight = bufferHeight;
         
-        // Check if resolution scaling is enabled via debug flag
-        const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-        
-        // Apply resolution scaling only if debug flag is enabled
-        const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
-            ? currentResolutionScale 
-            : 1.0;
-        
-        // Set canvas buffer to reference resolution (with optional resolution scale)
-        CANVAS.width = Math.floor(bufferWidth * resScale);
-        CANVAS.height = Math.floor(bufferHeight * resScale);
+        // Set canvas buffer to reference resolution
+        CANVAS.width = bufferWidth;
+        CANVAS.height = bufferHeight;
         
         // Stretch canvas to fill actual screen (creates zoom effect)
         CANVAS.style.width = screenWidth + 'px';
         CANVAS.style.height = screenHeight + 'px';
+        
+        // Disable antialiasing for crisp pixel-art look
+        CTX.imageSmoothingEnabled = false;
     }
 });

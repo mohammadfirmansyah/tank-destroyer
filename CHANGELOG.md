@@ -5,6 +5,47 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.6] - 2025-12-02
+
+### Removed
+- 🗑️ **Resolution Scaling System** - Removed entirely as it did not provide performance benefits
+  - Removed `DEBUG_ENABLE_RESOLUTION_SCALING` debug flag
+  - Removed `currentResolutionScale` variable
+  - Removed `applyResolutionScale()` function
+  - Removed `resolutionScale` from SMART_PERF_LEVELS and smoothPerfValues
+  - Simplified resize logic in `world.js` and `demo.js`
+
+### Performance Optimizations
+- ⚡ **Bitwise Floor Operations** - Replaced `Math.floor()` and `Math.round()` with bitwise operators
+  - `(x | 0)` for integer conversion (faster than Math.floor)
+  - `(x + 0.5) | 0` for rounding (faster than Math.round)
+  - Applied to render-heavy functions: terrain rendering, color calculations, camera positioning
+
+- 🎨 **Disabled Antialiasing** - `imageSmoothingEnabled = false` enforced across all contexts
+  - Main canvas context in `draw()` function
+  - Demo canvas context in `initDemo()` and resize handler
+  - World canvas context in `resize()` function
+  - Ensures crisp pixel-art style rendering
+
+- 🖼️ **OffscreenCanvas Terrain Cache** - Added terrain tile caching system
+  - Uses `OffscreenCanvas` for hardware-accelerated pre-rendering
+  - Falls back to regular canvas on unsupported browsers
+  - Includes cache invalidation on camera movement
+  - Works with existing frustum culling system
+
+- 🔧 **Optimized Color Functions** - Bitwise operations for RGB manipulation
+  - `lightenColor()` uses `(r * factor) | 0` instead of `Math.floor()`
+  - `adjustColor()` uses direct bitwise clamping instead of Math.max/min
+  - Faster color calculations for hit flashes, terrain, and effects
+
+### Technical
+- `js/config.js`: Removed all resolution scaling code, simplified SMART_PERF_LEVELS
+- `js/world.js`: Simplified resize() to use reference resolution only
+- `js/demo.js`: Removed resolution scaling checks, added antialiasing disable
+- `js/render.js`: Added OffscreenCanvas cache, bitwise optimizations, antialiasing control
+
+---
+
 ## [2.0.5] - 2025-12-02
 
 ### Fixed

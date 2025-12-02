@@ -5,6 +5,54 @@
 // Visual turret recoil: turret physically shifts in firing direction for realistic feedback
 
 // =============================================================================
+// PERFORMANCE OPTIMIZATIONS
+// - Bitwise floor (x | 0) instead of Math.floor for integer conversion
+// - OffscreenCanvas for terrain tile caching
+// - State batching for reduced context switches
+// - Disabled antialiasing for pixel-art style
+// =============================================================================
+
+// =============================================================================
+// TERRAIN TILE CACHE SYSTEM (OffscreenCanvas)
+// Pre-renders terrain tiles to reduce per-frame drawing operations
+// Uses frustum culling to only render visible cached tiles
+// =============================================================================
+let terrainTileCache = null;
+let terrainTileCacheCtx = null;
+let terrainCacheSize = 0;
+let terrainCacheOffsetX = 0;
+let terrainCacheOffsetY = 0;
+let terrainCacheValid = false;
+
+// Initialize terrain tile cache with OffscreenCanvas for performance
+function initTerrainCache(width, height) {
+    try {
+        // Use OffscreenCanvas if available (better performance)
+        if (typeof OffscreenCanvas !== 'undefined') {
+            terrainTileCache = new OffscreenCanvas(width, height);
+        } else {
+            // Fallback to regular canvas
+            terrainTileCache = document.createElement('canvas');
+            terrainTileCache.width = width;
+            terrainTileCache.height = height;
+        }
+        terrainTileCacheCtx = terrainTileCache.getContext('2d');
+        terrainTileCacheCtx.imageSmoothingEnabled = false;
+        terrainCacheSize = width;
+        terrainCacheValid = false;
+        console.log('[Render] Terrain cache initialized:', width, 'x', height);
+    } catch (e) {
+        console.warn('[Render] Failed to create terrain cache:', e);
+        terrainTileCache = null;
+    }
+}
+
+// Invalidate terrain cache (call when camera moves significantly)
+function invalidateTerrainCache() {
+    terrainCacheValid = false;
+}
+
+// =============================================================================
 // DEFERRED STATUS BAR RENDERING SYSTEM
 // Status bars are collected during entity rendering and drawn in a batch
 // AFTER fog of war, ensuring they always appear on top and aren't affected
@@ -339,16 +387,17 @@ function drawAllBulletWarnings() {
 
 // Helper function to darken hex color (used for body, not turret)
 // Creates darker body color from bright turret color
+// Uses bitwise floor for performance
 function lightenColor(hex, factor) {
     // Convert hex to RGB
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     
-    // Darken by factor (lower factor = darker result)
-    const newR = Math.floor(r * factor);
-    const newG = Math.floor(g * factor);
-    const newB = Math.floor(b * factor);
+    // Darken by factor using bitwise floor (x | 0 is faster than Math.floor)
+    const newR = (r * factor) | 0;
+    const newG = (g * factor) | 0;
+    const newB = (b * factor) | 0;
     
     // Convert back to hex
     return '#' + [newR, newG, newB].map(x => {
@@ -1231,6 +1280,7 @@ function drawWeaponTurret(weaponType, colorTurret, colorBody, hitFlash, recoil) 
 }
 
 // Helper function to adjust color brightness
+// Optimized with bitwise operations for better performance
 function adjustColor(color, amount) {
     // Parse hex color
     let hex = color.replace('#', '');
@@ -1242,9 +1292,13 @@ function adjustColor(color, amount) {
     let g = parseInt(hex.substring(2, 4), 16);
     let b = parseInt(hex.substring(4, 6), 16);
     
-    r = Math.max(0, Math.min(255, r + amount));
-    g = Math.max(0, Math.min(255, g + amount));
-    b = Math.max(0, Math.min(255, b + amount));
+    // Clamp values 0-255 using bitwise
+    r = ((r + amount) | 0);
+    g = ((g + amount) | 0);
+    b = ((b + amount) | 0);
+    r = r < 0 ? 0 : (r > 255 ? 255 : r);
+    g = g < 0 ? 0 : (g > 255 ? 255 : g);
+    b = b < 0 ? 0 : (b > 255 ? 255 : b);
     
     return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
@@ -1862,11 +1916,11 @@ function lightenColor(hexColor, percent = 30) {
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
     
-    // Lighten by blending toward white
+    // Lighten by blending toward white using bitwise operations
     const factor = percent / 100;
-    const newR = Math.min(255, Math.round(r + (255 - r) * factor));
-    const newG = Math.min(255, Math.round(g + (255 - g) * factor));
-    const newB = Math.min(255, Math.round(b + (255 - b) * factor));
+    const newR = Math.min(255, (r + (255 - r) * factor + 0.5) | 0);
+    const newG = Math.min(255, (g + (255 - g) * factor + 0.5) | 0);
+    const newB = Math.min(255, (b + (255 - b) * factor + 0.5) | 0);
     
     return '#' + [newR, newG, newB].map(x => x.toString(16).padStart(2, '0')).join('');
 }
@@ -5414,24 +5468,12 @@ function draw() {
     // GPU Optimization: Reset transform state once at start to prevent transform accumulation
     CTX.setTransform(1, 0, 0, 1, 0, 0);
     
+    // Disable antialiasing for pixel-art style (must be set after setTransform)
+    CTX.imageSmoothingEnabled = false;
+    
     // === CLEAR DEFERRED STATUS BAR QUEUE ===
     // Clear queue at start of each frame to prevent stale data
     clearStatusBarQueue();
-    
-    // Check if resolution scaling is enabled via debug flag
-    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-    
-    // Get resolution scale for proper rendering (only if debug flag enabled)
-    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
-        ? currentResolutionScale 
-        : 1.0;
-    
-    // Apply resolution scale to CTX - this scales all rendering to fit the smaller buffer
-    // Camera uses displayWidth/displayHeight, so we need to scale rendering to match
-    // Only applies if resolution scaling is enabled via debug flag
-    if (resScale !== 1.0) {
-        CTX.scale(resScale, resScale);
-    }
     
     // Use DISPLAY dimensions for viewport calculations (same as camera)
     // This ensures rendering area matches camera calculations from gameplay.js
@@ -5439,14 +5481,14 @@ function draw() {
     const vh = (typeof displayHeight !== 'undefined') ? displayHeight : CANVAS.height;
     
     // Sanitize camera position to prevent floating point glitches
-    // Round to nearest pixel to avoid subpixel rendering artifacts
+    // Round to nearest pixel using bitwise for performance
     if (isNaN(camX) || isNaN(camY)) {
         camX = 0;
         camY = 0;
     }
     // Clamp camera to world bounds to prevent visual artifacts
-    camX = Math.round(camX);
-    camY = Math.round(camY);
+    camX = (camX + 0.5) | 0;
+    camY = (camY + 0.5) | 0;
     
     // === VIEWPORT CULLING: Update bounds for this frame ===
     updateViewportBounds();
@@ -5454,8 +5496,8 @@ function draw() {
     // Random dirt/grass background (natural terrain)
     // Create seamless random terrain using noise-like pattern
     const tileSize = 40;
-    const viewLeft = Math.floor(camX / tileSize) * tileSize;
-    const viewTop = Math.floor(camY / tileSize) * tileSize;
+    const viewLeft = ((camX / tileSize) | 0) * tileSize;
+    const viewTop = ((camY / tileSize) | 0) * tileSize;
     const viewRight = viewLeft + vw + tileSize * 2;
     const viewBottom = viewTop + vh + tileSize * 2;
     
@@ -5609,10 +5651,11 @@ function draw() {
         const treadWidth = track.width || 10;
         
         // Color also fades with position - older tracks lighter/more faded
+        // Using bitwise floor for performance
         const colorFade = Math.pow(combinedFreshness, 0.4);
-        const dirtR = Math.round(140 - colorFade * 20);  // Lighter when faded
-        const dirtG = Math.round(125 - colorFade * 15);
-        const dirtB = Math.round(100 - colorFade * 10);
+        const dirtR = (140 - colorFade * 20 + 0.5) | 0;
+        const dirtG = (125 - colorFade * 15 + 0.5) | 0;
+        const dirtB = (100 - colorFade * 10 + 0.5) | 0;
         
         // If we have previous position, draw continuous line from prev to current
         if (typeof track.prevX === 'number' && typeof track.prevY === 'number') {

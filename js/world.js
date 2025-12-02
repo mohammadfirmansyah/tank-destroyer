@@ -46,7 +46,6 @@ function calculateReferenceZoom() {
 
 // Robust resize function with mobile glitch prevention
 // Uses REFERENCE RESOLUTION for consistent visual experience
-// NOTE: Resolution scaling only applies if DEBUG_ENABLE_RESOLUTION_SCALING is true in config.js
 function resize() {
     // Get actual viewport dimensions
     const newWidth = window.innerWidth;
@@ -66,26 +65,13 @@ function resize() {
     // Buffer uses reference height, width is calculated to match aspect ratio
     const aspectRatio = newWidth / newHeight;
     const bufferHeight = referenceHeight;
-    const bufferWidth = Math.round(referenceHeight * aspectRatio);
+    const bufferWidth = (referenceHeight * aspectRatio + 0.5) | 0;
     
     // Store display dimensions globally for camera/viewport calculations
     // Camera should use buffer dimensions (reference resolution) for consistent zoom
     // displayWidth/displayHeight represent the "virtual" viewport in world units
     displayWidth = bufferWidth;
     displayHeight = bufferHeight;
-    
-    // Check if resolution scaling is enabled via debug flag
-    const resScalingEnabled = (typeof DEBUG_ENABLE_RESOLUTION_SCALING !== 'undefined') && DEBUG_ENABLE_RESOLUTION_SCALING;
-    
-    // Get current resolution scale (only applies if debug flag is enabled)
-    // This is ADDITIONAL scaling on top of reference resolution
-    const resScale = resScalingEnabled && (typeof currentResolutionScale !== 'undefined') 
-        ? currentResolutionScale 
-        : 1.0;
-    
-    // Calculate final buffer dimensions with resolution scale applied
-    const finalBufferWidth = Math.floor(bufferWidth * resScale);
-    const finalBufferHeight = Math.floor(bufferHeight * resScale);
     
     // Skip if display dimensions haven't actually changed
     if (newWidth === lastWidth && newHeight === lastHeight) return;
@@ -95,8 +81,8 @@ function resize() {
     lastHeight = newHeight;
     
     // Apply dimensions to canvas internal buffer (using reference resolution)
-    CANVAS.width = finalBufferWidth;
-    CANVAS.height = finalBufferHeight;
+    CANVAS.width = bufferWidth;
+    CANVAS.height = bufferHeight;
     
     // Apply CSS dimensions for display (stretch to fill actual screen)
     // This creates the zoom effect: reference resolution stretched to screen size
@@ -109,7 +95,7 @@ function resize() {
     CANVAS.style.imageRendering = '-moz-crisp-edges';
     CANVAS.style.imageRendering = 'crisp-edges';
     
-    // Disable image smoothing for crisp pixel-art look
+    // Disable image smoothing for crisp pixel-art look (disable antialiasing)
     if (typeof CTX !== 'undefined' && CTX) {
         CTX.imageSmoothingEnabled = false;
     }
