@@ -5,6 +5,46 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.5] - 2025-12-03
+
+### Fixed
+- 🔫 **Player Firing Bug After Continue/Load** - Critical save/load fix
+  - Player tank now always able to fire immediately after loading saved game
+  - Reset `fireDelay`, `overheated`, `temperature` states in `deserializePlayer()`
+  - Reset `consecutiveShots`, `lastShotTime`, `thermalLocked` for clean fire state
+  - Ensures firing system works identically to new game after continue
+
+- 🖱️ **Mobile Cursor Arrow on Pause Button** - Touch device fix enhancement
+  - Added `!important` flag to override any conflicting cursor styles
+  - Added wildcard selectors (`*`) to cover all child elements
+  - Added `#pause-btn` ID selector for higher specificity
+  - Added `.controls-area` and children to cursor: none rule
+  - Prevents arrow cursor from appearing on any HUD element tap
+
+### Technical
+- `js/saveManager.js`:
+  - `deserializePlayer()` now resets:
+    - `fireDelay: 0` - fire cooldown
+    - `overheated: false` - overheat state
+    - `temperature: 20` - normal temperature
+    - `baseTemperature: 20` - base temp
+    - `thermalLocked: false` - thermal lock
+    - `consecutiveShots: 0` - shot counter
+    - `lastShotTime: 0` - last shot timestamp
+
+- `css/style.css`:
+  - `@media (pointer: coarse)` enhanced with:
+    - `.pause-btn, #pause-btn { cursor: none !important; }`
+    - `.hud-top *, .stats-panel *, .top-right *` wildcard selectors
+    - `.controls-area, .controls-area *` for joystick area
+    - `!important` flag ensures override
+
+- `index.html`:
+  - Updated version number to v2.1.5
+
+- `js/cache-buster.js`:
+  - Updated `CACHE_BUSTER_VERSION` to v2.1.5
+
 ## [2.1.4] - 2025-12-03
 
 ### Fixed

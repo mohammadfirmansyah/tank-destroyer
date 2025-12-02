@@ -1962,16 +1962,23 @@ canvas {
 
 /* Hide cursor on touch devices during gameplay to prevent arrow cursor appearing */
 @media (pointer: coarse) {
-	.pause-btn {
-		cursor: none;
+	.pause-btn,
+	#pause-btn {
+		cursor: none !important;
 	}
 	
 	.hud-top,
+	.hud-top *,
 	.stats-panel,
+	.stats-panel *,
 	.top-right,
+	.top-right *,
 	.minimap-box,
-	#wave-indicator {
-		cursor: none;
+	#wave-indicator,
+	#pause-btn,
+	.controls-area,
+	.controls-area * {
+		cursor: none !important;
 	}
 }
 

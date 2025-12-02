@@ -309,6 +309,16 @@ function deserializePlayer(data) {
     clone.criticalDamage = clone.criticalDamage || 2.5;
     clone.coolingEfficiency = typeof clone.coolingEfficiency === 'number' ? clone.coolingEfficiency : 1.0;
     
+    // CRITICAL: Reset firing state to fix bug where player can't shoot after load
+    // These values should always start fresh - don't restore from save
+    clone.fireDelay = 0;         // Reset fire cooldown
+    clone.overheated = false;    // Reset overheat state
+    clone.temperature = 20;      // Reset to normal temperature
+    clone.baseTemperature = 20;  // Reset base temperature
+    clone.thermalLocked = false; // Reset thermal lock
+    clone.consecutiveShots = 0;  // Reset shot counter
+    clone.lastShotTime = 0;      // Reset last shot timestamp
+    
     return clone;
 }
 
