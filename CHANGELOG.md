@@ -5,14 +5,30 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.3] - 2025-12-03
+## [2.1.4] - 2025-12-03
 
 ### Fixed
-- 🐛 **Mobile Cursor Bug on Pause Button** - Touch device fix
-  - Fixed arrow cursor appearing when pressing pause button on mobile
-  - Added `cursor: none` for touch devices (`pointer: coarse`) on HUD elements
-  - Affects: `.pause-btn`, `.hud-top`, `.stats-panel`, `.top-right`, `.minimap-box`, `#wave-indicator`
-  - Cursor now stays hidden during gameplay on mobile devices
+- 🎵 **Music Playing Wrong Track Bug** - Critical soundtrack fix
+  - Fixed opening music playing on achievement, game, and pause screens
+  - Fixed `getExpectedTrack()` to properly detect hidden elements (display:none + hidden class)
+  - Fixed `onUserInteraction()` to use `getExpectedTrack()` on first interaction instead of stale `pendingTrack`
+  - Fixed `play()` to clear `pendingTrack` immediately when user has already interacted
+  - Added `isVisible()` helper that checks classList, inline style, and computed style
+
+### Technical
+- `js/music.js`:
+  - Added `isVisible(el)` helper - checks hidden class, display:none, and computed style
+  - Fixed `getExpectedTrack()` to use `isVisible()` for proper screen detection
+  - Fixed `onUserInteraction()` - uses `getExpectedTrack()` on first interaction
+  - Fixed `play()` - clears `pendingTrack` when user has interacted
+
+- `index.html`:
+  - Updated version number to v2.1.4
+
+- `js/cache-buster.js`:
+  - Updated `CACHE_BUSTER_VERSION` to v2.1.4
+
+## [2.1.3] - 2025-12-03
 
 ### Added
 - 🎵 **Comprehensive Music Validation System** - Smart soundtrack verification
@@ -43,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `js/splash.js`:
   - Added `ensureCorrectMusic()` calls in `startSplashAnimations()`, `showHomepage()`
 
+## [2.1.2] - 2025-12-03
+
+### Fixed
+- 🐛 **Mobile Cursor Bug on Pause Button** - Touch device fix
+  - Fixed arrow cursor appearing when pressing pause button on mobile
+  - Added `cursor: none` for touch devices (`pointer: coarse`) on HUD elements
+  - Affects: `.pause-btn`, `.hud-top`, `.stats-panel`, `.top-right`, `.minimap-box`, `#wave-indicator`
+  - Cursor now stays hidden during gameplay on mobile devices
+
+### Technical
 - `css/style.css`:
   - Added `@media (pointer: coarse)` rule for touch devices
   - Set `cursor: none` on all HUD interactive elements for mobile

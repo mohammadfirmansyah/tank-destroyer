@@ -244,12 +244,13 @@ const MusicManager = (function() {
     
     // Public play function - handles user interaction requirement
     async function play(trackName, forceRestart = false) {
-        // Always update pending track to latest request
-        pendingTrack = trackName;
-        
         if (userHasInteracted) {
+            // Clear pending track since we're playing immediately
+            pendingTrack = null;
             await playTrackInternal(trackName, forceRestart);
         } else {
+            // Queue track for when user interacts
+            pendingTrack = trackName;
             console.log('[Music] Queued track (waiting for interaction):', trackName);
         }
     }
@@ -268,13 +269,19 @@ const MusicManager = (function() {
         const wasInteracted = userHasInteracted;
         userHasInteracted = true;
         
-        // Always try to play pending track on interaction (helps with browser timing)
-        if (pendingTrack) {
-            if (!wasInteracted) {
-                console.log('[Music] First interaction detected, playing:', pendingTrack);
-            } else {
-                console.log('[Music] Re-trying pending track:', pendingTrack);
+        // On first interaction, determine the correct track based on current screen
+        // This prevents playing stale pendingTrack (e.g., 'opening' when already on home)
+        if (!wasInteracted) {
+            // First interaction - use getExpectedTrack to determine correct music
+            const expectedTrack = getExpectedTrack();
+            console.log('[Music] First interaction detected, expected track:', expectedTrack, ', pending was:', pendingTrack);
+            pendingTrack = null; // Clear stale pending track
+            if (expectedTrack) {
+                playTrackInternal(expectedTrack);
             }
+        } else if (pendingTrack) {
+            // Subsequent interactions - retry pending track if any
+            console.log('[Music] Re-trying pending track:', pendingTrack);
             const trackToPlay = pendingTrack;
             pendingTrack = null;
             playTrackInternal(trackToPlay);
@@ -500,36 +507,48 @@ const MusicManager = (function() {
         const victoryScreen = document.getElementById('victory-screen');
         const splashScreen = document.getElementById('splash-screen');
         
+        // Helper function to check if element is visible
+        // Handles both classList.contains('hidden') and display:none
+        const isVisible = (el) => {
+            if (!el) return false;
+            if (el.classList.contains('hidden')) return false;
+            if (el.style.display === 'none') return false;
+            // Check computed style for elements hidden via CSS
+            const computed = window.getComputedStyle(el);
+            if (computed.display === 'none' || computed.visibility === 'hidden') return false;
+            return true;
+        };
+        
         // Priority order for screen detection (most specific first)
         
         // 1. Splash screen - opening music
-        if (splashScreen && !splashScreen.classList.contains('hidden')) {
+        if (isVisible(splashScreen)) {
             return 'opening';
         }
         
         // 2. Victory screen - victory music
-        if (victoryScreen && !victoryScreen.classList.contains('hidden')) {
+        if (isVisible(victoryScreen)) {
             return 'victory';
         }
         
         // 3. Game over screen - failed music
-        if (gameoverScreen && !gameoverScreen.classList.contains('hidden')) {
+        if (isVisible(gameoverScreen)) {
             return 'failed';
         }
         
         // 4. Pause screen - pause music (only when game is paused)
-        if (pauseScreen && !pauseScreen.classList.contains('hidden')) {
+        if (isVisible(pauseScreen)) {
             return 'pause';
         }
         
         // 5. Achievement screen - achievement music
-        if (achievementScreen && !achievementScreen.classList.contains('hidden')) {
+        if (isVisible(achievementScreen)) {
             return 'achievement';
         }
         
         // 6. Settings screen - inherit from parent context (home or pause)
         //    Settings doesn't have its own music, it uses the underlying screen's music
-        if (settingsScreen && !settingsScreen.classList.contains('hidden')) {
+        if (isVisible(settingsScreen)) {
             // Check if game is in progress (paused state) or at home
             if (typeof state !== 'undefined' && state === 'GAME') {
                 return 'pause'; // Settings opened from pause screen
@@ -538,7 +557,7 @@ const MusicManager = (function() {
         }
         
         // 7. Home overlay - home music
-        if (overlay && !overlay.classList.contains('hidden')) {
+        if (isVisible(overlay)) {
             return 'home';
         }
         
