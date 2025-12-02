@@ -1960,6 +1960,21 @@ canvas {
 	transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
 }
 
+/* Hide cursor on touch devices during gameplay to prevent arrow cursor appearing */
+@media (pointer: coarse) {
+	.pause-btn {
+		cursor: none;
+	}
+	
+	.hud-top,
+	.stats-panel,
+	.top-right,
+	.minimap-box,
+	#wave-indicator {
+		cursor: none;
+	}
+}
+
 /* CONTROLS AREA */
 .controls-area {
 	position: fixed;
