@@ -151,6 +151,15 @@ function startGame() {
     lastFrameTime = -1;
     frameTimeAccumulator = 0;
     
+    // Step 8: Reset input states for fresh game start
+    // This fixes bug where shooting doesn't work after returning from idle/menu
+    if (typeof resetMouseAimState === 'function') {
+        resetMouseAimState();
+    }
+    if (typeof resetAllInputStates === 'function') {
+        resetAllInputStates();
+    }
+    
     // Show UI layer when game starts
     document.getElementById('ui-layer').classList.add('active');
     
@@ -299,6 +308,11 @@ function togglePause() {
     }
     else {
         document.getElementById('pause-screen').classList.add('hidden');
+        
+        // Reset input states when resuming from pause
+        if (typeof resetMouseAimState === 'function') resetMouseAimState();
+        if (typeof resetAllInputStates === 'function') resetAllInputStates();
+        
         lastTime = performance.now();
         loop(performance.now());
         
@@ -316,6 +330,15 @@ function returnHome() {
         if (typeof saveGame === 'function') {
             saveGame();
         }
+    }
+    
+    // Reset input states when returning to home
+    // This fixes bug where input gets stuck after screen transitions
+    if (typeof resetMouseAimState === 'function') {
+        resetMouseAimState();
+    }
+    if (typeof resetAllInputStates === 'function') {
+        resetAllInputStates();
     }
     
     // Play home music

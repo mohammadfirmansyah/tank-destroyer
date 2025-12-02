@@ -5,6 +5,41 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5] - 2025-12-02
+
+### Fixed
+- 🎮 **Tank Shooting Bug** - Fixed critical bug where player tank wouldn't shoot after:
+  - Game sitting idle for extended periods
+  - Switching between screens (menu → game → pause → game)
+  - Window losing and regaining focus
+  - Loading saved games
+  - **Root Cause**: `mouseAim.active` was initialized as `true` but never properly reset during state transitions
+  - **Solution**: Added comprehensive input state reset system across all game state transitions
+
+### Changed
+- 🔄 **Improved Cache Buster** - Force hard refresh every time application opens
+  - Now performs true cache bypass on every fresh page load (not just per session)
+  - Uses `fetch` with `cache: 'reload'` header for reliable cache bypass
+  - Pre-fetches critical resources (CSS, JS) with cache bypass before reload
+  - Improved Chrome Mobile handling for GPU cache issues
+  - Clears sessionStorage completely on each refresh for clean state
+
+### Added
+- 🎯 **Input State Reset System** - New functions for reliable input handling
+  - `resetMouseAimState()` - Complete reset of mouse aim state (position, buttons, angle)
+  - Enhanced `resetAllInputStates()` - Now also resets `mouseAim.active`
+  - Input reset calls added to: `startGame()`, `returnHome()`, `togglePause()`, `loadGame()`
+  - Focus handler now clears stuck mouse button states
+
+### Technical
+- `js/config.js`: Changed `mouseAim.active` initial value from `true` to `false`
+- `js/input.js`: Added `resetMouseAimState()`, improved event handlers
+- `js/gameplay.js`: Added input reset calls in state transition functions
+- `js/saveManager.js`: Added input reset calls in `loadGame()`
+- `js/cache-buster.js`: Complete rewrite for reliable force refresh
+
+---
+
 ## [2.0.4] - 2025-12-02
 
 ### Added

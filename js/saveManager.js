@@ -201,6 +201,10 @@ function loadGame() {
         document.getElementById('ui-layer').classList.add('active');
         resize();
         resetVirtualJoysticks();
+        
+        // Reset input states to prevent stuck controls
+        if (typeof resetMouseAimState === 'function') resetMouseAimState();
+        if (typeof resetAllInputStates === 'function') resetAllInputStates();
 
         // Update continue button state since save is now consumed
         if (typeof updateContinueButtonState === 'function') {

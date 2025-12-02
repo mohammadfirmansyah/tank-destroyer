@@ -2,21 +2,22 @@
  * Cache Buster - Force fresh assets on every page load
  * This script clears all browser caches and ensures fresh content
  * 
- * v2.0.0-RC.10 Update:
- * - Added Chrome Mobile specific cache clearing
- * - Clear IndexedDB and localStorage game state on version change
- * - Detect corrupt cache state from previous sessions
+ * v2.0.5 Update:
+ * - Force hard refresh EVERY time application opens (not just per session)
+ * - Clear all browser caches including HTTP cache
+ * - Use fetch with cache: 'reload' for true cache bypass
+ * - Improved Chrome Mobile handling
  */
 
 (function() {
     'use strict';
     
-    const CACHE_BUSTER_VERSION = 'v2.0.4';
-    const CACHE_BUSTER_KEY = 'tank_destroyer_cache_cleared';
+    const CACHE_BUSTER_VERSION = 'v2.0.5';
     const CACHE_VERSION_KEY = 'tank_destroyer_version';
+    const LAST_LOAD_KEY = 'tank_destroyer_last_load';
     
     /**
-     * Detect if running on Chrome Mobile (not incognito)
+     * Detect if running on Chrome Mobile
      * Chrome Mobile has known issues with canvas GPU state caching
      */
     function isChromeMobile() {
@@ -39,7 +40,16 @@
     }
     
     /**
-     * Clear all caches including Cache API and Service Workers
+     * Check if this is a fresh page load (not a reload from cache-buster)
+     * We use a timestamp in URL to detect our own reloads
+     */
+    function isOurReload() {
+        const url = new URL(window.location.href);
+        return url.searchParams.has('_hardRefresh');
+    }
+    
+    /**
+     * Clear all caches including Cache API, Service Workers, and HTTP cache
      * This ensures completely fresh assets on every visit
      */
     async function clearAllCaches() {
@@ -77,17 +87,10 @@
             }
         }
         
-        // 3. Clear sessionStorage cache markers
+        // 3. Clear sessionStorage completely (fresh start each time)
         try {
-            // Keep game saves, only clear cache-related data
-            const keysToRemove = [];
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.startsWith('cache_')) {
-                    keysToRemove.push(key);
-                }
-            }
-            keysToRemove.forEach(key => sessionStorage.removeItem(key));
+            sessionStorage.clear();
+            console.log('[CacheBuster] SessionStorage cleared');
         } catch (err) {
             console.warn('[CacheBuster] SessionStorage clear failed:', err);
         }
@@ -96,72 +99,65 @@
     }
     
     /**
-     * Add cache-busting query parameters to resource URLs
-     * Uses timestamp to ensure unique URLs on every page load
+     * Pre-fetch critical resources with cache bypass to ensure fresh copies
+     * This forces the browser to download fresh versions
      */
-    function bustResourceCaches() {
-        const timestamp = Date.now();
-        const bustParam = `_cb=${timestamp}`;
+    async function prefetchFreshResources() {
+        const criticalResources = [
+            'css/style.css',
+            'js/config.js',
+            'js/input.js',
+            'js/gameplay.js',
+            'js/render.js'
+        ];
         
-        // Bust CSS links
-        document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
-            if (link.href && !link.href.includes('_cb=')) {
-                const separator = link.href.includes('?') ? '&' : '?';
-                link.href = link.href + separator + bustParam;
+        console.log('[CacheBuster] Pre-fetching fresh resources...');
+        
+        const fetchPromises = criticalResources.map(async (resource) => {
+            try {
+                // Use cache: 'reload' to bypass browser cache and fetch fresh
+                await fetch(resource, { 
+                    cache: 'reload',
+                    headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+                });
+                console.log(`[CacheBuster] Prefetched: ${resource}`);
+            } catch (err) {
+                console.warn(`[CacheBuster] Failed to prefetch ${resource}:`, err);
             }
         });
         
-        // Bust script tags (for dynamically loaded scripts)
-        document.querySelectorAll('script[src]').forEach(script => {
-            // Skip cache-buster itself and inline scripts
-            if (script.src && !script.src.includes('cache-buster') && !script.src.includes('_cb=')) {
-                const separator = script.src.includes('?') ? '&' : '?';
-                // Note: Changing script.src doesn't reload it, this is for reference
-            }
-        });
-        
-        console.log(`[CacheBuster] Resources marked with timestamp: ${timestamp}`);
-    }
-    
-    /**
-     * Force hard reload if this is a new session
-     * Only triggers once per browser session to avoid reload loops
-     */
-    function checkAndReload() {
-        const sessionKey = CACHE_BUSTER_KEY + '_' + CACHE_BUSTER_VERSION;
-        
-        // Check if we've already cleared cache this session
-        if (sessionStorage.getItem(sessionKey)) {
-            console.log('[CacheBuster] Cache already cleared this session');
-            return false;
-        }
-        
-        // Mark that we're about to clear and reload
-        sessionStorage.setItem(sessionKey, Date.now().toString());
-        
-        return true;
+        await Promise.all(fetchPromises);
     }
     
     /**
      * Main initialization
-     * Clears caches and optionally triggers a hard reload
+     * Clears caches and performs hard reload on every fresh page load
      */
     async function init() {
         console.log(`[CacheBuster] Initializing ${CACHE_BUSTER_VERSION}`);
         
-        // Check if this is Chrome Mobile (known to have canvas caching issues)
-        const chromeMobile = isChromeMobile();
-        if (chromeMobile) {
-            console.log('[CacheBuster] Chrome Mobile detected - applying extra cache clearing');
+        // If this is already our reload (has _hardRefresh param), clean up and continue
+        if (isOurReload()) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('_hardRefresh');
+            window.history.replaceState({}, '', url.toString());
+            console.log('[CacheBuster] Hard refresh completed - assets are fresh');
+            
+            // Update last load timestamp
+            try {
+                localStorage.setItem(LAST_LOAD_KEY, Date.now().toString());
+                localStorage.setItem(CACHE_VERSION_KEY, CACHE_BUSTER_VERSION);
+            } catch (e) {}
+            
+            return; // Continue loading the game normally
         }
         
-        // Check if version changed (requires deeper clear)
+        // Check if version changed
         const versionChanged = hasVersionChanged();
         if (versionChanged) {
-            console.log(`[CacheBuster] Version changed to ${CACHE_BUSTER_VERSION} - clearing old cache state`);
+            console.log(`[CacheBuster] Version changed to ${CACHE_BUSTER_VERSION} - deep cache clear`);
             try {
-                // Clear any corrupt canvas state from previous version
-                // by removing all tank destroyer related localStorage except saves
+                // Clear any corrupt state from previous version (keep saves and highscores)
                 const keysToRemove = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -170,61 +166,50 @@
                     }
                 }
                 keysToRemove.forEach(key => localStorage.removeItem(key));
-                
-                // Update stored version
-                localStorage.setItem(CACHE_VERSION_KEY, CACHE_BUSTER_VERSION);
             } catch (e) {
                 console.warn('[CacheBuster] localStorage cleanup failed:', e);
             }
         }
         
-        const shouldClearCache = checkAndReload();
-        
-        // Chrome Mobile needs extra refresh on first load to clear GPU cache
-        if (shouldClearCache || (chromeMobile && versionChanged)) {
-            // Clear all caches
-            await clearAllCaches();
-            
-            // Bust resource caches with query params
-            bustResourceCaches();
-            
-            // Force hard reload to get fresh assets
-            // Using location.reload(true) for cache bypass (deprecated but still works)
-            // Modern approach: reload with cache bypass header
-            console.log('[CacheBuster] Performing hard reload for fresh assets...');
-            
-            // Small delay to ensure cache clearing completes
-            setTimeout(() => {
-                // Add timestamp to URL to force fresh load
-                const url = new URL(window.location.href);
-                url.searchParams.set('_refresh', Date.now().toString());
-                window.location.replace(url.toString());
-            }, 100);
-            
-            return; // Stop execution, page will reload
+        // Check if Chrome Mobile (needs extra care)
+        const chromeMobile = isChromeMobile();
+        if (chromeMobile) {
+            console.log('[CacheBuster] Chrome Mobile detected - extra cache clearing');
         }
         
-        // If we've already reloaded, clean up the URL
+        // ALWAYS clear caches and perform hard refresh on fresh page load
+        console.log('[CacheBuster] Fresh page load detected - performing hard refresh');
+        
+        // Clear all caches first
+        await clearAllCaches();
+        
+        // Pre-fetch critical resources with cache bypass
+        await prefetchFreshResources();
+        
+        // Perform hard reload with unique timestamp
+        // This ensures browser fetches completely fresh HTML
         const url = new URL(window.location.href);
-        if (url.searchParams.has('_refresh')) {
-            url.searchParams.delete('_refresh');
-            window.history.replaceState({}, '', url.toString());
-            console.log('[CacheBuster] Cleanup: removed refresh param from URL');
-        }
+        url.searchParams.set('_hardRefresh', Date.now().toString());
         
-        console.log('[CacheBuster] Fresh assets loaded successfully');
+        console.log('[CacheBuster] Redirecting to fresh URL...');
+        
+        // Use location.replace to prevent back-button loops
+        window.location.replace(url.toString());
     }
     
     // Run immediately when script loads
     init();
     
-    // Expose for manual cache clearing (optional)
+    // Expose manual cache clearing function
     window.TankDestroyer = window.TankDestroyer || {};
     window.TankDestroyer.clearCache = async function() {
-        sessionStorage.removeItem(CACHE_BUSTER_KEY + '_' + CACHE_BUSTER_VERSION);
         localStorage.removeItem(CACHE_VERSION_KEY);
+        localStorage.removeItem(LAST_LOAD_KEY);
         await clearAllCaches();
         window.location.reload();
     };
+    
+    // Expose version for debugging
+    window.TankDestroyer.cacheVersion = CACHE_BUSTER_VERSION;
     
 })();

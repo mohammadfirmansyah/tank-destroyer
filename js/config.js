@@ -124,9 +124,11 @@ let spawnDelay = 0;
 // Mouse control state - direction-based aiming (not screen center)
 // leftDown: fire toward mouse, rightDown: move toward mouse direction
 let mouseAim = { 
-    active: true, 
+    active: false,    // Set to true only when mouse is actively used
     x: 0, 
-    y: 0, 
+    y: 0,
+    screenX: 0,        // Raw screen coordinates for crosshair
+    screenY: 0,
     leftDown: false,   // Left-click = shoot
     rightDown: false,  // Right-click = move
     angle: 0,          // Direction angle from player to mouse (world coords)
@@ -250,7 +252,7 @@ const DEBUG_FPS_LIMITER = false;
 // Optimizations include: particle reduction, culling distance adjustment, effect simplification.
 // Useful for: Low-end devices, mobile browsers, maintaining 60 FPS target.
 // Default: true (Smart Performance enabled)
-const DEBUG_SMART_PERFORMANCE = false;
+const DEBUG_SMART_PERFORMANCE = true;
 
 // =============================================================================
 // SMART PERFORMANCE OPTIMIZER SYSTEM - COMPREHENSIVE BOTTLENECK DETECTION
@@ -298,7 +300,7 @@ const PERF_LERP_SPEED_RECOVERY = 0.25; // FASTER transition when RECOVERING qual
 // Set to true to enable resolution scaling via SmartPerf (experimental)
 // Set to false to disable - canvas always renders at native resolution
 // =============================================================================
-const DEBUG_ENABLE_RESOLUTION_SCALING = false;
+const DEBUG_ENABLE_RESOLUTION_SCALING = true;
 
 // Track current applied resolution scale - used by resize() in world.js
 let currentResolutionScale = 1.0;

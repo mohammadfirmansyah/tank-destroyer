@@ -348,17 +348,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // Left-click (button 0) = Shoot toward mouse direction
 // Right-click (button 2) = Move tank toward mouse direction
 window.addEventListener('mousedown', e => {
-    // Only respond to canvas clicks during gameplay
-    if (e.target.tagName !== 'CANVAS') return;
+    // Skip if not in game state or paused
+    if (state !== 'GAME' || paused) return;
+    
+    // Allow canvas clicks OR clicks anywhere when game is active
+    // This fixes the bug where shooting stops working after idle/screen switch
     setInputMode(INPUT_MODE.DESKTOP);
     
     if (e.button === 0) {
         // Left-click = shoot
         mouseAim.leftDown = true;
         mouseAim.down = true; // Legacy compatibility
+        mouseAim.active = true; // Ensure mouseAim is active
     } else if (e.button === 2) {
         // Right-click = move
         mouseAim.rightDown = true;
+        mouseAim.active = true;
     }
 });
 
@@ -386,11 +391,23 @@ function resetAllInputStates() {
     mouseAim.down = false;
     mouseAim.leftDown = false;
     mouseAim.rightDown = false;
-    // NOTE: Don't reset mouseAim.active here - it should persist
-    // The angle is still valid, only the firing state (down) should reset
+    // Reset mouseAim.active to ensure fresh state
+    // It will be re-enabled on next mousemove event
+    mouseAim.active = false;
     input.aim.active = false;
     input.move.active = false;
     resetVirtualJoysticks();
+}
+
+// Complete reset for mouseAim - call when switching screens or starting game
+function resetMouseAimState() {
+    mouseAim.active = false;
+    mouseAim.down = false;
+    mouseAim.leftDown = false;
+    mouseAim.rightDown = false;
+    mouseAim.x = 0;
+    mouseAim.y = 0;
+    mouseAim.angle = 0;
 }
 
 // Handle visibility change (tab switch, minimize)
@@ -407,9 +424,12 @@ window.addEventListener('blur', () => {
 
 // Handle window focus restoration
 window.addEventListener('focus', () => {
-    // Don't reset all input states on focus - this was causing aim/fire bugs
-    // Only reset stuck keys that might have been held during blur
-    // The blur handler already clears states, focus should allow fresh input
+    // Reset mouse button states on focus to ensure clean state
+    // This fixes the bug where shooting doesn't work after returning from idle
+    mouseAim.leftDown = false;
+    mouseAim.rightDown = false;
+    mouseAim.down = false;
+    // Note: Don't reset mouseAim.active - let mousemove re-enable it
 });
 
 // Show deploy confirmation popup with dramatic animation
