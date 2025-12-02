@@ -5,6 +5,33 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2025-12-03
+
+### Fixed
+- 🎯 **Custom Crosshair on Mobile Touch** - Critical mobile fix
+  - Custom crosshair (red reticle) no longer appears on mobile/touch devices
+  - Added touch device detection in `drawDesktopCrosshair()`
+  - Prevents synthetic mouse events from triggering crosshair display
+  - Fixed `mousemove` handler to not switch to DESKTOP mode on touch devices
+  - Crosshair now exclusively for desktop mouse users
+
+### Technical
+- `js/render.js`:
+  - `drawDesktopCrosshair()` now checks `'ontouchstart' in window || navigator.maxTouchPoints > 0`
+  - Returns early if device has touch capability
+  - Ensures crosshair never renders on mobile even if mode is DESKTOP
+
+- `js/input.js`:
+  - `mousemove` handler now detects touch devices before switching to DESKTOP mode
+  - Uses `isTouchDevice` check to prevent mode switch on touch emulated events
+  - Synthetic mouse events from touch no longer trigger desktop mode
+
+- `index.html`:
+  - Updated version number to v2.1.6
+
+- `js/cache-buster.js`:
+  - Updated `CACHE_BUSTER_VERSION` to v2.1.6
+
 ## [2.1.5] - 2025-12-03
 
 ### Fixed

@@ -104,7 +104,18 @@ window.addEventListener('keyup', e => {
 // This allows aiming in any direction regardless of where mouse is on screen
 window.addEventListener('mousemove', e => {
     if (state !== 'GAME' || paused) return;
-    setInputMode(INPUT_MODE.DESKTOP);
+    
+    // CRITICAL: Don't switch to desktop mode if this is a synthetic mouse event from touch
+    // Touch devices emulate mouse events, which would incorrectly show crosshair
+    // Check if device has touch capability and if this might be a touch-emulated event
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isPrimaryPointer = e.pointerType === undefined || e.pointerType === 'mouse';
+    
+    // Only switch to desktop mode on real mouse devices
+    // On touch devices, stay in touch mode to prevent crosshair from appearing
+    if (!isTouchDevice || isPrimaryPointer) {
+        setInputMode(INPUT_MODE.DESKTOP);
+    }
     
     // Store raw screen coordinates for crosshair rendering
     mouseAim.screenX = e.clientX;

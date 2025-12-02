@@ -12889,6 +12889,11 @@ function drawDesktopCrosshair() {
     // Hide crosshair during demo mode - no player control in demo
     if (typeof demoActive !== 'undefined' && demoActive === true) return;
     
+    // CRITICAL: Never show crosshair on touch devices
+    // Even if activeInputMode is DESKTOP, touch devices should not display crosshair
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
+    
     // Get screen coordinates from mouseAim (CSS/screen pixel position)
     const screenX = mouseAim.screenX;
     const screenY = mouseAim.screenY;
