@@ -86,6 +86,8 @@ function startSplashAnimations() {
     // until user interacts with the page (browser autoplay policy)
     if (typeof MusicManager !== 'undefined') {
         MusicManager.play('opening');
+        // Verify correct music after user interaction
+        setTimeout(() => MusicManager.ensureCorrectMusic('splash screen'), 200);
     }
     
     // Add initial entrance effect to first page
@@ -245,6 +247,8 @@ function showHomepage() {
     // Switch to home music when homepage shows
     if (typeof MusicManager !== 'undefined') {
         MusicManager.play('home');
+        // Verify correct music after short delay
+        setTimeout(() => MusicManager.ensureCorrectMusic('homepage shown'), 100);
     }
     
     // NOTE: Demo is now started early in dismissSplash() for smooth transition

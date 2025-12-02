@@ -199,9 +199,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.classList.add('achievements-open');
                 if (typeof renderAchievementsPage === 'function') renderAchievementsPage();
                 
-                // Play achievement music
+                // Play achievement music with verification
                 if (typeof MusicManager !== 'undefined') {
                     MusicManager.play('achievement');
+                    // Verify correct music after short delay (handles race conditions)
+                    setTimeout(() => MusicManager.ensureCorrectMusic('achievements screen opened'), 100);
                 }
             });
         });
@@ -223,9 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('overlay').classList.remove('hidden');
                     document.body.classList.remove('achievements-open');
                     
-                    // Return to home music
+                    // Return to home music with verification
                     if (typeof MusicManager !== 'undefined') {
                         MusicManager.play('home');
+                        // Verify correct music after short delay
+                        setTimeout(() => MusicManager.ensureCorrectMusic('achievements screen closed'), 100);
                     }
                 }, 300); // Match CSS animation duration
             });

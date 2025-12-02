@@ -10203,9 +10203,11 @@ function showVictoryScreen() {
     document.getElementById('pause-screen').classList.add('hidden');
     document.getElementById('gameover-screen').classList.add('hidden');
     
-    // Play victory music
+    // Play victory music with verification
     if (typeof MusicManager !== 'undefined') {
         MusicManager.play('victory');
+        // Verify correct music after short delay
+        setTimeout(() => MusicManager.ensureCorrectMusic('victory screen shown'), 100);
     }
     
     // Show victory screen with dramatic entrance

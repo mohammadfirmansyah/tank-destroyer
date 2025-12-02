@@ -5,7 +5,7 @@ All notable changes to Tank Destroyer: Ultimate Edition will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.2] - 2025-12-03
+## [2.1.3] - 2025-12-03
 
 ### Fixed
 - 🐛 **Mobile Cursor Bug on Pause Button** - Touch device fix
@@ -14,7 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Affects: `.pause-btn`, `.hud-top`, `.stats-panel`, `.top-right`, `.minimap-box`, `#wave-indicator`
   - Cursor now stays hidden during gameplay on mobile devices
 
+### Added
+- 🎵 **Comprehensive Music Validation System** - Smart soundtrack verification
+  - New `getExpectedTrack()` function determines correct music based on current screen state
+  - New `ensureCorrectMusic()` function validates and corrects playing music
+  - New `getMusicState()` function for debugging music state
+  - Automatic music correction when wrong track is playing
+  - Screen detection priority: splash → victory → gameover → pause → achievement → settings → home → game
+  - All screen transitions now include music verification with 100ms delay
+
 ### Technical
+- `js/music.js`:
+  - Added `getExpectedTrack()` - determines expected track based on DOM screen visibility
+  - Added `ensureCorrectMusic(contextHint)` - validates and corrects music state
+  - Added `getMusicState()` - returns debug info about current music state
+  - Exported new functions in public API
+
+- `js/input.js`:
+  - Added `ensureCorrectMusic()` calls when opening/closing achievements screen
+
+- `js/gameplay.js`:
+  - Added `ensureCorrectMusic()` calls in `togglePause()`, `returnHome()`, `startGame()`
+  - Added `ensureCorrectMusic()` call in `finalizeGameOver()`
+
+- `js/systems.js`:
+  - Added `ensureCorrectMusic()` call in `showVictoryScreen()`
+
+- `js/splash.js`:
+  - Added `ensureCorrectMusic()` calls in `startSplashAnimations()`, `showHomepage()`
+
 - `css/style.css`:
   - Added `@media (pointer: coarse)` rule for touch devices
   - Set `cursor: none` on all HUD interactive elements for mobile

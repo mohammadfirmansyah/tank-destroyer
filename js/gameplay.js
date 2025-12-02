@@ -166,6 +166,8 @@ function startGame() {
     // Restart game music from beginning (fresh start for deploy/restart)
     if (typeof MusicManager !== 'undefined') {
         MusicManager.restartGameMusic();
+        // Verify correct music after short delay
+        setTimeout(() => MusicManager.ensureCorrectMusic('game started'), 100);
     }
     
     terrainNoiseOffsetX = Math.random() * 10000;
@@ -304,6 +306,8 @@ function togglePause() {
         // Pause game music and play pause music
         if (typeof MusicManager !== 'undefined') {
             MusicManager.pauseGameMusic();
+            // Verify correct music after short delay
+            setTimeout(() => MusicManager.ensureCorrectMusic('game paused'), 100);
         }
     }
     else {
@@ -319,6 +323,8 @@ function togglePause() {
         // Resume game music
         if (typeof MusicManager !== 'undefined') {
             MusicManager.resumeGameMusic();
+            // Verify correct music after short delay
+            setTimeout(() => MusicManager.ensureCorrectMusic('game resumed'), 100);
         }
     }
 }
@@ -341,9 +347,11 @@ function returnHome() {
         resetAllInputStates();
     }
     
-    // Play home music
+    // Play home music with verification
     if (typeof MusicManager !== 'undefined') {
         MusicManager.play('home');
+        // Verify correct music after short delay
+        setTimeout(() => MusicManager.ensureCorrectMusic('returned to home'), 150);
     }
     
     // Check if coming from victory screen for special exit animation
@@ -5200,9 +5208,11 @@ function endGame(fromDeath = false) {
         if (fromDeath) screen.classList.add('mission-failed-enter');
         else screen.classList.remove('mission-failed-enter');
 
-        // Play failed music
+        // Play failed music with verification
         if (typeof MusicManager !== 'undefined') {
             MusicManager.play('failed');
+            // Verify correct music after short delay
+            setTimeout(() => MusicManager.ensureCorrectMusic('game over screen shown'), 100);
         }
 
         const gameCanvas = document.getElementById('gameCanvas');

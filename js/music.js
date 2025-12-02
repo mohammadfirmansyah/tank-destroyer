@@ -485,6 +485,122 @@ const MusicManager = (function() {
         console.log('[Music] Initialized, enabled:', isMusicEnabled, 'volume:', masterVolume);
     }
     
+    /**
+     * Determine expected track based on current screen/game state
+     * This is the source of truth for what music should be playing
+     * @returns {string|null} Track name that should be playing, or null if no track expected
+     */
+    function getExpectedTrack() {
+        // Check DOM elements to determine current screen
+        const overlay = document.getElementById('overlay');
+        const achievementScreen = document.getElementById('achievements-screen');
+        const settingsScreen = document.getElementById('settings-screen');
+        const pauseScreen = document.getElementById('pause-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const victoryScreen = document.getElementById('victory-screen');
+        const splashScreen = document.getElementById('splash-screen');
+        
+        // Priority order for screen detection (most specific first)
+        
+        // 1. Splash screen - opening music
+        if (splashScreen && !splashScreen.classList.contains('hidden')) {
+            return 'opening';
+        }
+        
+        // 2. Victory screen - victory music
+        if (victoryScreen && !victoryScreen.classList.contains('hidden')) {
+            return 'victory';
+        }
+        
+        // 3. Game over screen - failed music
+        if (gameoverScreen && !gameoverScreen.classList.contains('hidden')) {
+            return 'failed';
+        }
+        
+        // 4. Pause screen - pause music (only when game is paused)
+        if (pauseScreen && !pauseScreen.classList.contains('hidden')) {
+            return 'pause';
+        }
+        
+        // 5. Achievement screen - achievement music
+        if (achievementScreen && !achievementScreen.classList.contains('hidden')) {
+            return 'achievement';
+        }
+        
+        // 6. Settings screen - inherit from parent context (home or pause)
+        //    Settings doesn't have its own music, it uses the underlying screen's music
+        if (settingsScreen && !settingsScreen.classList.contains('hidden')) {
+            // Check if game is in progress (paused state) or at home
+            if (typeof state !== 'undefined' && state === 'GAME') {
+                return 'pause'; // Settings opened from pause screen
+            }
+            return 'home'; // Settings opened from home screen
+        }
+        
+        // 7. Home overlay - home music
+        if (overlay && !overlay.classList.contains('hidden')) {
+            return 'home';
+        }
+        
+        // 8. Game is actively playing (no overlay, no screens visible)
+        if (typeof state !== 'undefined' && state === 'GAME') {
+            return 'game';
+        }
+        
+        // Default to home if can't determine
+        return 'home';
+    }
+    
+    /**
+     * Check and ensure correct music is playing for current screen
+     * Call this when opening/closing any screen to validate music state
+     * @param {string} [contextHint] Optional hint about expected track for logging
+     * @returns {boolean} True if music was corrected, false if already correct
+     */
+    function ensureCorrectMusic(contextHint = '') {
+        const expectedTrack = getExpectedTrack();
+        const actualTrack = currentTrackName;
+        
+        // Also check pending track for race condition scenarios
+        const effectiveTrack = actualTrack || pendingTrack;
+        
+        const isCorrect = effectiveTrack === expectedTrack;
+        
+        if (!isCorrect) {
+            console.log(`[Music] Correcting music: was "${effectiveTrack}", should be "${expectedTrack}"${contextHint ? ` (${contextHint})` : ''}`);
+            
+            // Stop wrong music and play correct one
+            if (expectedTrack) {
+                play(expectedTrack);
+            } else {
+                stop();
+            }
+            return true;
+        }
+        
+        // Log for debugging in development
+        if (contextHint) {
+            console.log(`[Music] Verified correct: "${effectiveTrack}" for ${contextHint}`);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Validate music state - useful for debugging
+     * @returns {object} Current music state information
+     */
+    function getMusicState() {
+        return {
+            currentTrack: currentTrackName,
+            pendingTrack: pendingTrack,
+            expectedTrack: getExpectedTrack(),
+            isPlaying: currentTrack && !currentTrack.paused,
+            isMuted: isMuted,
+            userHasInteracted: userHasInteracted
+        };
+    }
+    
     // Public API
     return {
         init,
@@ -501,6 +617,9 @@ const MusicManager = (function() {
         getCurrentTime,
         getCurrentTrackName,
         playAtTime,
+        getExpectedTrack,
+        ensureCorrectMusic,
+        getMusicState,
         TRACKS: {
             OPENING: 'opening',
             HOME: 'home',
